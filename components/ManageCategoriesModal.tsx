@@ -50,6 +50,10 @@ export function ManageCategoriesModal({
   const [editedName, setEditedName] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // isMounted guard to prevent state updates after unmount
+  const isMounted = useRef(true);
   
   // Animation for sliding down from top
   const slideAnim = useRef(new Animated.Value(-1000)).current;
@@ -63,6 +67,9 @@ export function ManageCategoriesModal({
   }, [items, categoryToDelete]);
 
   useEffect(() => {
+    // Set isMounted to true when component mounts
+    isMounted.current = true;
+    
     if (visible) {
       console.log('Opening Manage Categories top sheet');
       // Slide down from top
@@ -80,6 +87,12 @@ export function ManageCategoriesModal({
         useNativeDriver: true,
       }).start();
     }
+    
+    // Cleanup function to set isMounted to false when component unmounts
+    return () => {
+      console.log('ManageCategoriesModal unmounting - setting isMounted to false');
+      isMounted.current = false;
+    };
   }, [visible]);
 
   const handleAddCategory = () => {
@@ -125,9 +138,10 @@ export function ManageCategoriesModal({
   };
 
   const handleDeleteRequest = (category: Category) => {
-    console.log('User requested delete for category:', category.name);
+    console.log('User tapped trash icon for category:', category.name);
     
     if (category.isDefault) {
+      console.warn('Attempted to delete a default category:', category.name);
       Toast.show({
         type: 'error',
         text1: "Default categories can't be deleted",
@@ -135,48 +149,89 @@ export function ManageCategoriesModal({
       return;
     }
     
+    console.log('Showing confirmation dialog for category deletion');
     setCategoryToDelete(category);
     setDeleteConfirmVisible(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (categoryToDelete) {
-      console.log('User confirmed permanent deletion of category and all items:', categoryToDelete.name);
-      
+    if (!categoryToDelete) {
+      console.warn('No category to delete');
+      setDeleteConfirmVisible(false);
+      return;
+    }
+    
+    console.log('User confirmed deletion of category:', categoryToDelete.name);
+    
+    // Close the confirmation modal first
+    setDeleteConfirmVisible(false);
+    
+    // Set deleting state to disable UI during deletion
+    if (isMounted.current) {
+      setIsDeleting(true);
+    }
+    
+    try {
+      // Call the delete function
       const success = await onDeleteCategory(categoryToDelete.categoryId);
       
-      if (success) {
-        Toast.show({
-          type: 'success',
-          text1: 'Category deleted',
-        });
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        if (success) {
+          console.log('Category deleted successfully');
+          Toast.show({
+            type: 'success',
+            text1: 'Category deleted',
+          });
+        } else {
+          console.error('Category deletion failed');
+          Toast.show({
+            type: 'error',
+            text1: 'Failed to delete category',
+          });
+        }
       } else {
+        console.log('Component unmounted during deletion - skipping state update');
+      }
+    } catch (error) {
+      console.error('Error during category deletion:', error);
+      if (isMounted.current) {
         Toast.show({
           type: 'error',
           text1: 'Failed to delete category',
         });
       }
-      
-      setCategoryToDelete(null);
+    } finally {
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        setIsDeleting(false);
+        setCategoryToDelete(null);
+      }
     }
-    setDeleteConfirmVisible(false);
   };
 
   const handleCancelDelete = () => {
-    console.log('Cancelled category deletion');
+    console.log('User cancelled category deletion');
     setCategoryToDelete(null);
     setDeleteConfirmVisible(false);
   };
 
   const handleClose = () => {
-    console.log('Closing Manage Categories top sheet');
+    console.log('User tapped X to close Manage Categories sheet');
+    
+    // Don't allow close while deletion is in progress
+    if (isDeleting) {
+      console.log('Deletion in progress - preventing close');
+      return;
+    }
+    
     Keyboard.dismiss();
     onClose();
   };
 
-  const deleteConfirmTitle = 'Delete Category and All Items?';
+  const deleteConfirmTitle = 'Delete category?';
   const deleteConfirmMessage = categoryToDelete
-    ? `This will permanently delete the category "${categoryToDelete.name}" and all ${itemsInCategoryCount} item${itemsInCategoryCount !== 1 ? 's' : ''} in it, along with their history. This action cannot be undone.`
+    ? `This will remove the category "${categoryToDelete.name}". Items in this category will be moved to Uncategorised.`
     : '';
 
   return (
@@ -193,6 +248,7 @@ export function ManageCategoriesModal({
             style={styles.backdrop}
             activeOpacity={1}
             onPress={handleClose}
+            disabled={isDeleting}
           />
           
           {/* Top Sheet - slides down from top */}
@@ -219,9 +275,10 @@ export function ManageCategoriesModal({
                     ios_icon_name="xmark"
                     android_material_icon_name="close"
                     size={24}
-                    color={theme.text}
+                    color={isDeleting ? theme.textSecondary : theme.text}
                     onPress={handleClose}
                     accessibilityLabel="Close"
+                    disabled={isDeleting}
                   />
                 </View>
 
@@ -246,18 +303,19 @@ export function ManageCategoriesModal({
                       onChangeText={setNewCategoryName}
                       returnKeyType="done"
                       onSubmitEditing={handleAddCategory}
+                      editable={!isDeleting}
                     />
                     <TouchableOpacity
                       style={[
                         styles.addButton,
                         {
-                          backgroundColor: newCategoryName.trim()
+                          backgroundColor: newCategoryName.trim() && !isDeleting
                             ? theme.primary
                             : theme.border,
                         },
                       ]}
                       onPress={handleAddCategory}
-                      disabled={!newCategoryName.trim()}
+                      disabled={!newCategoryName.trim() || isDeleting}
                     >
                       <IconSymbol
                         ios_icon_name="plus"
@@ -274,6 +332,7 @@ export function ManageCategoriesModal({
                   style={styles.scrollView}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={true}
+                  scrollEnabled={!isDeleting}
                 >
                   {/* Default Categories */}
                   <View style={styles.section}>
@@ -333,9 +392,10 @@ export function ManageCategoriesModal({
                                   autoFocus
                                   returnKeyType="done"
                                   onSubmitEditing={handleSaveEdit}
+                                  editable={!isDeleting}
                                 />
                                 <View style={styles.editActions}>
-                                  <TouchableOpacity onPress={handleSaveEdit}>
+                                  <TouchableOpacity onPress={handleSaveEdit} disabled={isDeleting}>
                                     <IconSymbol
                                       ios_icon_name="checkmark"
                                       android_material_icon_name="check"
@@ -343,7 +403,7 @@ export function ManageCategoriesModal({
                                       color={theme.success}
                                     />
                                   </TouchableOpacity>
-                                  <TouchableOpacity onPress={handleCancelEdit}>
+                                  <TouchableOpacity onPress={handleCancelEdit} disabled={isDeleting}>
                                     <IconSymbol
                                       ios_icon_name="xmark"
                                       android_material_icon_name="close"
@@ -359,22 +419,30 @@ export function ManageCategoriesModal({
                                   {category.name}
                                 </Text>
                                 <View style={styles.actions}>
-                                  <TouchableOpacity onPress={() => handleStartEdit(category)}>
+                                  <TouchableOpacity 
+                                    onPress={() => handleStartEdit(category)}
+                                    disabled={isDeleting}
+                                  >
                                     <IconSymbol
                                       ios_icon_name="pencil"
                                       android_material_icon_name="edit"
                                       size={20}
-                                      color={theme.primary}
+                                      color={isDeleting ? theme.textSecondary : theme.primary}
                                     />
                                   </TouchableOpacity>
-                                  <TouchableOpacity onPress={() => handleDeleteRequest(category)}>
-                                    <IconSymbol
-                                      ios_icon_name="trash"
-                                      android_material_icon_name="delete"
-                                      size={20}
-                                      color={theme.danger}
-                                    />
-                                  </TouchableOpacity>
+                                  {!category.isDefault && (
+                                    <TouchableOpacity 
+                                      onPress={() => handleDeleteRequest(category)}
+                                      disabled={isDeleting}
+                                    >
+                                      <IconSymbol
+                                        ios_icon_name="trash"
+                                        android_material_icon_name="delete"
+                                        size={20}
+                                        color={isDeleting ? theme.textSecondary : theme.danger}
+                                      />
+                                    </TouchableOpacity>
+                                  )}
                                 </View>
                               </>
                             )}
@@ -398,7 +466,7 @@ export function ManageCategoriesModal({
         visible={deleteConfirmVisible}
         title={deleteConfirmTitle}
         message={deleteConfirmMessage}
-        confirmText="Delete Permanently"
+        confirmText="Delete"
         cancelText="Cancel"
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}

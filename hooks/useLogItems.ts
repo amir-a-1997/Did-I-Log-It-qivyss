@@ -1,7 +1,8 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { storage } from '@/utils/storage';
 import { LogItem, LogEntry, Category, DEFAULT_CATEGORIES } from '@/types/LogItem';
+import Toast from 'react-native-toast-message';
 
 const STORAGE_KEY = 'did_i_log_it_items';
 const CATEGORIES_KEY = 'did_i_log_it_categories';
@@ -266,8 +267,8 @@ export function useLogItems() {
 
   const deleteCategory = useCallback(async (categoryId: string): Promise<boolean> => {
     try {
-      console.log('=== STARTING CATEGORY DELETION ===');
-      console.log('Permanently deleting category and all items in it:', categoryId);
+      console.log('=== STARTING CATEGORY DELETION (SOFT DELETE ITEMS) ===');
+      console.log('Deleting category and moving items to Uncategorised:', categoryId);
       
       // CRITICAL: Read from storage first to ensure we have the latest data (single source of truth)
       const storedItems = await storage.getItem(STORAGE_KEY);
@@ -284,6 +285,7 @@ export function useLogItems() {
       
       if (!categoryToDelete) {
         console.warn('Category not found for deletion:', categoryId);
+        Toast.show({ type: 'error', text1: 'Category not found.' });
         return false;
       }
       
@@ -291,19 +293,23 @@ export function useLogItems() {
       
       if (categoryToDelete.isDefault) {
         console.warn('Attempted to delete a default category:', categoryId);
+        Toast.show({ type: 'error', text1: "Default categories can't be deleted." });
         return false;
       }
       
       // Find all items that belong to this category
-      const itemsToDelete = currentItems.filter((item: LogItem) => item.categoryId === categoryId);
-      console.log('Items to permanently delete:', itemsToDelete.length);
-      itemsToDelete.forEach((item: LogItem) => {
-        console.log('  - Deleting item:', item.title, 'with', item.logs.length, 'logs');
+      const itemsToUpdate = currentItems.filter((item: LogItem) => item.categoryId === categoryId);
+      console.log('Items to move to Uncategorised (categoryId = null):', itemsToUpdate.length);
+      itemsToUpdate.forEach((item: LogItem) => {
+        console.log('  - Moving item:', item.title);
       });
       
-      // Permanently delete all items in this category (including their logs)
-      const updatedItems = currentItems.filter((item: LogItem) => item.categoryId !== categoryId);
-      console.log('Remaining items after deletion:', updatedItems.length);
+      // Set categoryId to null for items in the deleted category (move to Uncategorised)
+      // DO NOT delete items or their logs
+      const updatedItems = currentItems.map((item: LogItem) =>
+        item.categoryId === categoryId ? { ...item, categoryId: null } : item
+      );
+      console.log('Items updated - total count:', updatedItems.length);
       
       // Remove the category from the custom categories list
       const updatedCategories = currentCategories.filter((cat: Category) => cat.categoryId !== categoryId);
@@ -311,7 +317,7 @@ export function useLogItems() {
       
       // Save both to persistent storage
       await storage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
-      console.log('✓ Items saved to storage');
+      console.log('✓ Items saved to storage (categoryId set to null for affected items)');
       
       await storage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories));
       console.log('✓ Categories saved to storage');
@@ -325,15 +331,18 @@ export function useLogItems() {
       const verifyItems = await storage.getItem(STORAGE_KEY);
       const verifiedItems = verifyItems ? JSON.parse(verifyItems) : [];
       console.log('Verified items after category deletion - total count:', verifiedItems.length);
+      const uncategorisedCount = verifiedItems.filter((item: LogItem) => item.categoryId === null).length;
+      console.log('Verified uncategorised items count:', uncategorisedCount);
       
       const verifyCategories = await storage.getItem(CATEGORIES_KEY);
       const verifiedCategories = verifyCategories ? JSON.parse(verifyCategories) : [];
       console.log('Verified categories after deletion - total count:', verifiedCategories.length);
       
-      console.log('=== CATEGORY DELETION COMPLETE ===');
+      console.log('=== CATEGORY DELETION COMPLETE (ITEMS MOVED TO UNCATEGORISED) ===');
       return true;
     } catch (error) {
-      console.error('Failed to delete category and items:', error);
+      console.error('Failed to delete category:', error);
+      Toast.show({ type: 'error', text1: 'Failed to delete category.' });
       return false;
     }
   }, []);
