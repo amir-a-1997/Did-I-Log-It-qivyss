@@ -17,6 +17,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { WidgetProvider } from "@/contexts/WidgetContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import Toast from "react-native-toast-message";
 // Note: Error logging is auto-initialized via index.ts import
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -103,6 +104,7 @@ export default function RootLayout() {
           </WidgetProvider>
         </NavigationThemeProvider>
       </ThemeProvider>
+      <Toast />
     </>
   );
 }

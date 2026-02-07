@@ -1,14 +1,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { storage } from '@/utils/storage';
-import { LogItem, LogEntry, Category } from '@/types/LogItem';
+import { LogItem, LogEntry, Category, DEFAULT_CATEGORIES } from '@/types/LogItem';
 
 const STORAGE_KEY = 'did_i_log_it_items';
 const CATEGORIES_KEY = 'did_i_log_it_categories';
 
 export function useLogItems() {
   const [items, setItems] = useState<LogItem[]>([]);
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [customCategories, setCustomCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Load items and categories from storage
@@ -24,16 +24,43 @@ export function useLogItems() {
       const storedItems = await storage.getItem(STORAGE_KEY);
       if (storedItems) {
         const parsed = JSON.parse(storedItems);
-        setItems(parsed);
-        console.log('Loaded items:', parsed.length);
+        
+        // Migration: Convert old string-based categories to categoryId
+        const migratedItems = parsed.map((item: any) => {
+          if (item.category && !item.categoryId) {
+            // Find matching default category
+            const defaultCat = DEFAULT_CATEGORIES.find(cat => cat.name === item.category);
+            return {
+              ...item,
+              categoryId: defaultCat ? defaultCat.categoryId : 'default-home',
+            };
+          }
+          return item;
+        });
+        
+        setItems(migratedItems);
+        console.log('Loaded items:', migratedItems.length);
       }
 
       // Load custom categories
       const storedCategories = await storage.getItem(CATEGORIES_KEY);
       if (storedCategories) {
         const parsed = JSON.parse(storedCategories);
-        setCustomCategories(parsed);
-        console.log('Loaded custom categories:', parsed);
+        
+        // Migration: Convert old string array to Category objects
+        if (parsed.length > 0 && typeof parsed[0] === 'string') {
+          const migratedCategories = parsed.map((name: string) => ({
+            categoryId: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name,
+            isDefault: false,
+          }));
+          setCustomCategories(migratedCategories);
+          await storage.setItem(CATEGORIES_KEY, JSON.stringify(migratedCategories));
+          console.log('Migrated custom categories to new format:', migratedCategories);
+        } else {
+          setCustomCategories(parsed);
+          console.log('Loaded custom categories:', parsed);
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -52,7 +79,7 @@ export function useLogItems() {
     }
   };
 
-  const saveCategories = async (categories: string[]) => {
+  const saveCategories = async (categories: Category[]) => {
     try {
       console.log('Saving custom categories to storage:', categories);
       await storage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
@@ -62,12 +89,12 @@ export function useLogItems() {
     }
   };
 
-  const addItem = async (title: string, category: string) => {
-    console.log('Adding new item:', title, category);
+  const addItem = async (title: string, categoryId: string) => {
+    console.log('Adding new item:', title, categoryId);
     const newItem: LogItem = {
       id: Date.now().toString(),
       title,
-      category,
+      categoryId,
       logs: [],
       createdAt: new Date().toISOString(),
       isDeleted: false,
@@ -193,64 +220,88 @@ export function useLogItems() {
 
   const addCategory = async (categoryName: string) => {
     console.log('Adding custom category:', categoryName);
-    if (!customCategories.includes(categoryName)) {
-      const updatedCategories = [...customCategories, categoryName];
+    
+    // Check if category name already exists
+    const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
+    const exists = allCategories.some(cat => cat.name === categoryName);
+    
+    if (!exists) {
+      const newCategory: Category = {
+        categoryId: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: categoryName,
+        isDefault: false,
+      };
+      const updatedCategories = [...customCategories, newCategory];
       await saveCategories(updatedCategories);
     }
   };
 
-  const renameCategory = async (oldName: string, newName: string) => {
-    console.log('Renaming category:', oldName, 'to', newName);
+  const renameCategory = async (categoryId: string, newName: string) => {
+    console.log('Renaming category:', categoryId, 'to', newName);
     
     // Update category list
     const updatedCategories = customCategories.map((cat) =>
-      cat === oldName ? newName : cat
+      cat.categoryId === categoryId ? { ...cat, name: newName } : cat
     );
     await saveCategories(updatedCategories);
-
-    // Update all items with this category
-    const updatedItems = items.map((item) =>
-      item.category === oldName ? { ...item, category: newName } : item
-    );
-    await saveItems(updatedItems);
   };
 
-  const deleteCategory = useCallback(async (categoryName: string) => {
-    console.log('Permanently deleting category and all items in it:', categoryName);
-    
-    // CRITICAL: Read from storage first to ensure we have the latest data (single source of truth)
-    const storedItems = await storage.getItem(STORAGE_KEY);
-    const currentItems = storedItems ? JSON.parse(storedItems) : [];
-    
-    const storedCategories = await storage.getItem(CATEGORIES_KEY);
-    const currentCategories = storedCategories ? JSON.parse(storedCategories) : [];
-    
-    console.log('Current items from storage before category deletion:', currentItems.length);
-    
-    // Find all items that belong to this category
-    const itemsToDelete = currentItems.filter((item: LogItem) => item.category === categoryName);
-    console.log('Items to permanently delete:', itemsToDelete.length);
-    
-    // Permanently delete all items in this category (including their logs)
-    const updatedItems = currentItems.filter((item: LogItem) => item.category !== categoryName);
-    
-    // Remove the category from the custom categories list
-    const updatedCategories = currentCategories.filter((cat: string) => cat !== categoryName);
-    
-    // Save both to persistent storage
-    await storage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
-    await storage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories));
-    
-    console.log('Category and all items permanently deleted and saved to storage');
-    
-    // Update in-memory state
-    setItems(updatedItems);
-    setCustomCategories(updatedCategories);
-    
-    // Verify the deletion by reading back from storage
-    const verifyItems = await storage.getItem(STORAGE_KEY);
-    const verifiedItems = verifyItems ? JSON.parse(verifyItems) : [];
-    console.log('Verified items after category deletion - total count:', verifiedItems.length);
+  const deleteCategory = useCallback(async (categoryId: string): Promise<boolean> => {
+    try {
+      console.log('Permanently deleting category and all items in it:', categoryId);
+      
+      // CRITICAL: Read from storage first to ensure we have the latest data (single source of truth)
+      const storedItems = await storage.getItem(STORAGE_KEY);
+      const currentItems = storedItems ? JSON.parse(storedItems) : [];
+      
+      const storedCategories = await storage.getItem(CATEGORIES_KEY);
+      const currentCategories = storedCategories ? JSON.parse(storedCategories) : [];
+      
+      console.log('Current items from storage before category deletion:', currentItems.length);
+      
+      // Find the category to delete
+      const categoryToDelete = currentCategories.find((cat: Category) => cat.categoryId === categoryId);
+      
+      if (!categoryToDelete) {
+        console.warn('Category not found for deletion:', categoryId);
+        return false;
+      }
+      
+      if (categoryToDelete.isDefault) {
+        console.warn('Attempted to delete a default category:', categoryId);
+        return false;
+      }
+      
+      // Find all items that belong to this category
+      const itemsToDelete = currentItems.filter((item: LogItem) => item.categoryId === categoryId);
+      console.log('Items to permanently delete:', itemsToDelete.length);
+      
+      // Permanently delete all items in this category (including their logs)
+      const updatedItems = currentItems.filter((item: LogItem) => item.categoryId !== categoryId);
+      
+      // Remove the category from the custom categories list
+      const updatedCategories = currentCategories.filter((cat: Category) => cat.categoryId !== categoryId);
+      
+      // Save both to persistent storage
+      await storage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
+      await storage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories));
+      
+      console.log('Category and all items permanently deleted and saved to storage');
+      
+      // Update in-memory state
+      setItems(updatedItems);
+      setCustomCategories(updatedCategories);
+      
+      // Verify the deletion by reading back from storage
+      const verifyItems = await storage.getItem(STORAGE_KEY);
+      const verifiedItems = verifyItems ? JSON.parse(verifyItems) : [];
+      console.log('Verified items after category deletion - total count:', verifiedItems.length);
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to delete category and items:', error);
+      return false;
+    }
   }, []);
 
   return {

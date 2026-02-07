@@ -16,19 +16,20 @@ import {
 import { getColors } from '@/styles/commonStyles';
 import { IconSymbol } from './IconSymbol';
 import { IconButton } from './IconButton';
-import { DEFAULT_CATEGORIES, LogItem } from '@/types/LogItem';
+import { DEFAULT_CATEGORIES, LogItem, Category } from '@/types/LogItem';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmModal } from './ConfirmModal';
+import Toast from 'react-native-toast-message';
 
 interface ManageCategoriesModalProps {
   visible: boolean;
   onClose: () => void;
-  customCategories: string[];
+  customCategories: Category[];
   onAddCategory: (name: string) => void;
-  onRenameCategory: (oldName: string, newName: string) => void;
-  onDeleteCategory: (name: string) => void;
-  items: LogItem[]; // Added to count items in a category
+  onRenameCategory: (categoryId: string, newName: string) => void;
+  onDeleteCategory: (categoryId: string) => Promise<boolean>;
+  items: LogItem[];
 }
 
 export function ManageCategoriesModal({
@@ -48,7 +49,7 @@ export function ManageCategoriesModal({
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   
   // Animation for sliding down from top
   const slideAnim = useRef(new Animated.Value(-1000)).current;
@@ -58,7 +59,7 @@ export function ManageCategoriesModal({
     if (!categoryToDelete) {
       return 0;
     }
-    return items.filter((item) => item.category === categoryToDelete && !item.isDeleted).length;
+    return items.filter((item) => item.categoryId === categoryToDelete.categoryId && !item.isDeleted).length;
   }, [items, categoryToDelete]);
 
   useEffect(() => {
@@ -88,13 +89,17 @@ export function ManageCategoriesModal({
       onAddCategory(trimmedName);
       setNewCategoryName('');
       Keyboard.dismiss();
+      Toast.show({
+        type: 'success',
+        text1: 'Category added',
+      });
     }
   };
 
-  const handleStartEdit = (categoryName: string) => {
-    console.log('Starting edit for category:', categoryName);
-    setEditingCategory(categoryName);
-    setEditedName(categoryName);
+  const handleStartEdit = (category: Category) => {
+    console.log('Starting edit for category:', category.name);
+    setEditingCategory(category.categoryId);
+    setEditedName(category.name);
   };
 
   const handleSaveEdit = () => {
@@ -105,6 +110,10 @@ export function ManageCategoriesModal({
       setEditingCategory(null);
       setEditedName('');
       Keyboard.dismiss();
+      Toast.show({
+        type: 'success',
+        text1: 'Category renamed',
+      });
     }
   };
 
@@ -115,16 +124,39 @@ export function ManageCategoriesModal({
     Keyboard.dismiss();
   };
 
-  const handleDeleteRequest = (categoryName: string) => {
-    console.log('User requested delete for category:', categoryName);
-    setCategoryToDelete(categoryName);
+  const handleDeleteRequest = (category: Category) => {
+    console.log('User requested delete for category:', category.name);
+    
+    if (category.isDefault) {
+      Toast.show({
+        type: 'error',
+        text1: "Default categories can't be deleted",
+      });
+      return;
+    }
+    
+    setCategoryToDelete(category);
     setDeleteConfirmVisible(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (categoryToDelete) {
-      console.log('User confirmed permanent deletion of category and all items:', categoryToDelete);
-      onDeleteCategory(categoryToDelete);
+      console.log('User confirmed permanent deletion of category and all items:', categoryToDelete.name);
+      
+      const success = await onDeleteCategory(categoryToDelete.categoryId);
+      
+      if (success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Category deleted',
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to delete category',
+        });
+      }
+      
       setCategoryToDelete(null);
     }
     setDeleteConfirmVisible(false);
@@ -144,7 +176,7 @@ export function ManageCategoriesModal({
 
   const deleteConfirmTitle = 'Delete Category and All Items?';
   const deleteConfirmMessage = categoryToDelete
-    ? `This will permanently delete the category "${categoryToDelete}" and all ${itemsInCategoryCount} item${itemsInCategoryCount !== 1 ? 's' : ''} in it, along with their history. This action cannot be undone.`
+    ? `This will permanently delete the category "${categoryToDelete.name}" and all ${itemsInCategoryCount} item${itemsInCategoryCount !== 1 ? 's' : ''} in it, along with their history. This action cannot be undone.`
     : '';
 
   return (
@@ -250,14 +282,14 @@ export function ManageCategoriesModal({
                     </Text>
                     {DEFAULT_CATEGORIES.map((category) => (
                       <View
-                        key={category}
+                        key={category.categoryId}
                         style={[
                           styles.categoryRow,
                           { backgroundColor: theme.card, borderColor: theme.border },
                         ]}
                       >
                         <Text style={[styles.categoryName, { color: theme.text }]}>
-                          {category}
+                          {category.name}
                         </Text>
                         <Text style={[styles.defaultBadge, { color: theme.textSecondary }]}>
                           Default
@@ -279,13 +311,13 @@ export function ManageCategoriesModal({
                       <>
                         {customCategories.map((category) => (
                           <View
-                            key={category}
+                            key={category.categoryId}
                             style={[
                               styles.categoryRow,
                               { backgroundColor: theme.card, borderColor: theme.border },
                             ]}
                           >
-                            {editingCategory === category ? (
+                            {editingCategory === category.categoryId ? (
                               <>
                                 <TextInput
                                   style={[
@@ -324,7 +356,7 @@ export function ManageCategoriesModal({
                             ) : (
                               <>
                                 <Text style={[styles.categoryName, { color: theme.text }]}>
-                                  {category}
+                                  {category.name}
                                 </Text>
                                 <View style={styles.actions}>
                                   <TouchableOpacity onPress={() => handleStartEdit(category)}>

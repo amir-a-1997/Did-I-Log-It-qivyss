@@ -12,189 +12,181 @@ import {
   Platform,
   Animated,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getColors } from '@/styles/commonStyles';
 import { IconSymbol } from './IconSymbol';
-import { DEFAULT_CATEGORIES } from '@/types/LogItem';
+import { DEFAULT_CATEGORIES, Category } from '@/types/LogItem';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface AddItemModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (title: string, category: string) => void;
-  customCategories: string[];
+  onAdd: (title: string, categoryId: string) => void;
+  customCategories: Category[];
 }
 
-export function AddItemModal({ visible, onClose, onAdd, customCategories }: AddItemModalProps) {
+export function AddItemModal({
+  visible,
+  onClose,
+  onAdd,
+  customCategories,
+}: AddItemModalProps) {
   const { effectiveColorScheme, accentColor } = useTheme();
   const theme = getColors(effectiveColorScheme, accentColor);
   const insets = useSafeAreaInsets();
+  
   const [title, setTitle] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(DEFAULT_CATEGORIES[0]);
-  const [slideAnim] = useState(new Animated.Value(-500));
-
-  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
+  const [selectedCategoryId, setSelectedCategoryId] = useState(DEFAULT_CATEGORIES[0].categoryId);
+  const slideAnim = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: -500,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
+      console.log('Opening Add Item modal');
       setTitle('');
-      setSelectedCategory(DEFAULT_CATEGORIES[0]);
+      setSelectedCategoryId(DEFAULT_CATEGORIES[0].categoryId);
     }
   }, [visible]);
 
   const handleAdd = () => {
-    if (title.trim()) {
-      console.log('Adding item:', title, selectedCategory);
-      onAdd(title.trim(), selectedCategory);
-      handleClose();
+    const trimmedTitle = title.trim();
+    if (trimmedTitle) {
+      console.log('Adding item:', trimmedTitle, 'with categoryId:', selectedCategoryId);
+      onAdd(trimmedTitle, selectedCategoryId);
+      setTitle('');
+      onClose();
     }
   };
 
   const handleClose = () => {
     console.log('Closing Add Item modal');
+    setTitle('');
     onClose();
   };
+
+  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalOverlay}
+        style={styles.container}
       >
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={handleClose}
         />
-        <Animated.View
-          style={[
-            styles.modalContent,
-            {
-              backgroundColor: theme.background,
-              paddingTop: insets.top + 16,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>Add New Item</Text>
-            <TouchableOpacity
-              onPress={handleClose}
-              style={[styles.closeButton, { backgroundColor: theme.card }]}
-            >
+        
+        <View style={[styles.modalContent, { backgroundColor: theme.background, paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.header, { borderBottomColor: theme.border }]}>
+            <Text style={[styles.title, { color: theme.text }]}>
+              Add New Item
+            </Text>
+            <TouchableOpacity onPress={handleClose}>
               <IconSymbol
                 ios_icon_name="xmark"
                 android_material_icon_name="close"
-                size={20}
+                size={24}
                 color={theme.text}
               />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
-            <View style={styles.form}>
-              <Text style={[styles.label, { color: theme.text }]}>Item Name</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.card,
-                    color: theme.text,
-                    borderColor: theme.border,
-                  },
-                ]}
-                placeholder="e.g., Changed bedsheets"
-                placeholderTextColor={theme.textSecondary}
-                value={title}
-                onChangeText={setTitle}
-                autoFocus
-              />
+          <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+            <Text style={[styles.label, { color: theme.text }]}>
+              Item Name
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.card,
+                  color: theme.text,
+                  borderColor: theme.border,
+                },
+              ]}
+              placeholder="e.g., Changed bedsheets"
+              placeholderTextColor={theme.textSecondary}
+              value={title}
+              onChangeText={setTitle}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleAdd}
+            />
 
-              <Text style={[styles.label, { color: theme.text }]}>Category</Text>
-              <View style={styles.categoryGrid}>
-                {allCategories.map((category) => {
-                  const isSelected = category === selectedCategory;
-                  return (
-                    <TouchableOpacity
-                      key={category}
+            <Text style={[styles.label, { color: theme.text }]}>
+              Category
+            </Text>
+            <View style={styles.categoryGrid}>
+              {allCategories.map((category) => {
+                const isSelected = selectedCategoryId === category.categoryId;
+                return (
+                  <TouchableOpacity
+                    key={category.categoryId}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: isSelected ? theme.primary : theme.card,
+                        borderColor: isSelected ? theme.primary : theme.border,
+                      },
+                    ]}
+                    onPress={() => setSelectedCategoryId(category.categoryId)}
+                  >
+                    <Text
                       style={[
-                        styles.categoryChip,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.card,
-                          borderColor: theme.border,
-                        },
+                        styles.categoryText,
+                        { color: isSelected ? '#FFFFFF' : theme.text },
                       ]}
-                      onPress={() => {
-                        console.log('Selected category:', category);
-                        setSelectedCategory(category);
-                      }}
                     >
-                      <Text
-                        style={[
-                          styles.categoryText,
-                          { color: isSelected ? '#FFFFFF' : theme.text },
-                        ]}
-                      >
-                        {category}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
 
-          <View style={[styles.footer, { borderTopColor: theme.border }]}>
-            <TouchableOpacity
-              style={[
-                styles.addButton,
-                { backgroundColor: title.trim() ? theme.primary : theme.border },
-              ]}
-              onPress={handleAdd}
-              disabled={!title.trim()}
-            >
-              <Text style={styles.addButtonText}>Add Item</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
+          <TouchableOpacity
+            style={[
+              styles.addButton,
+              {
+                backgroundColor: title.trim() ? theme.primary : theme.border,
+              },
+            ]}
+            onPress={handleAdd}
+            disabled={!title.trim()}
+          >
+            <Text style={styles.addButtonText}>
+              Add Item
+            </Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    maxHeight: '70%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
   },
@@ -203,42 +195,34 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
   },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollView: {
-    maxHeight: 400,
-  },
-  form: {
+  content: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 20,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
-    marginTop: 16,
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
     fontSize: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 24,
   },
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 24,
   },
   categoryChip: {
     paddingHorizontal: 16,
@@ -248,15 +232,13 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 14,
-    fontWeight: '600',
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
+    fontWeight: '500',
   },
   addButton: {
-    paddingVertical: 16,
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 12,
+    padding: 18,
     borderRadius: 12,
     alignItems: 'center',
   },

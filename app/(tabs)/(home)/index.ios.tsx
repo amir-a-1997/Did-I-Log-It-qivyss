@@ -28,7 +28,7 @@ export default function HomeScreen() {
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [manageCategoriesVisible, setManageCategoriesVisible] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('All');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
   const [permanentDeleteModalVisible, setPermanentDeleteModalVisible] = useState(false);
@@ -36,30 +36,36 @@ export default function HomeScreen() {
   const [restoreModalVisible, setRestoreModalVisible] = useState(false);
   const [itemToRestore, setItemToRestore] = useState<{ id: string; title: string } | null>(null);
 
-  // Sort categories: "All" first, then normal categories sorted alphabetically, then "Deleted" last
-  const sortedCategories = useMemo(() => {
+  // Combine all categories with "All" and "Deleted" options
+  const allCategoriesForFilter = useMemo(() => {
     const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
-    const uniqueCategories = Array.from(new Set(allCategories));
-    const sortedNormalCategories = uniqueCategories.sort((a, b) => a.localeCompare(b));
-    
-    // Return: ["All", ...sorted normal categories, "Deleted"]
-    return ['All', ...sortedNormalCategories, 'Deleted'];
+    return [
+      { categoryId: 'All', name: 'All', isDefault: false },
+      ...allCategories,
+      { categoryId: 'Deleted', name: 'Deleted', isDefault: false },
+    ];
   }, [customCategories]);
 
   // Filter items based on selected category
   const filteredItems = useMemo(() => {
-    if (selectedCategory === 'Deleted') {
+    if (selectedCategoryId === 'Deleted') {
       return items.filter((item) => item.isDeleted === true);
     }
     
     const activeItems = items.filter((item) => !item.isDeleted);
     
-    if (selectedCategory === 'All') {
+    if (selectedCategoryId === 'All') {
       return activeItems;
     }
     
-    return activeItems.filter((item) => item.category === selectedCategory);
-  }, [items, selectedCategory]);
+    return activeItems.filter((item) => item.categoryId === selectedCategoryId);
+  }, [items, selectedCategoryId]);
+
+  // Get category name for display
+  const getCategoryName = (categoryId: string) => {
+    const category = allCategoriesForFilter.find(cat => cat.categoryId === categoryId);
+    return category ? category.name : 'Unknown';
+  };
 
   const handleLogItem = (itemId: string) => {
     console.log('User tapped Log It button for item:', itemId);
@@ -144,7 +150,8 @@ export default function HomeScreen() {
     router.push('/settings');
   };
 
-  const isDeletedView = selectedCategory === 'Deleted';
+  const isDeletedView = selectedCategoryId === 'Deleted';
+  const selectedCategoryName = getCategoryName(selectedCategoryId);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -176,10 +183,9 @@ export default function HomeScreen() {
             style={styles.filterScroll}
             contentContainerStyle={styles.filterContent}
           >
-            {sortedCategories.map((category) => {
-              const isSelected = category === selectedCategory;
-              const isDeleted = category === 'Deleted';
-              const isManage = category === 'Manage';
+            {allCategoriesForFilter.map((category) => {
+              const isSelected = category.categoryId === selectedCategoryId;
+              const isDeleted = category.categoryId === 'Deleted';
               
               // Special styling for "Deleted" chip
               const chipBackgroundColor = isDeleted
@@ -190,7 +196,7 @@ export default function HomeScreen() {
 
               return (
                 <TouchableOpacity
-                  key={category}
+                  key={category.categoryId}
                   style={[
                     styles.filterChip,
                     {
@@ -199,8 +205,8 @@ export default function HomeScreen() {
                     },
                   ]}
                   onPress={() => {
-                    console.log('User selected filter:', category);
-                    setSelectedCategory(category);
+                    console.log('User selected filter:', category.name);
+                    setSelectedCategoryId(category.categoryId);
                   }}
                 >
                   <Text
@@ -209,7 +215,7 @@ export default function HomeScreen() {
                       { color: chipTextColor },
                     ]}
                   >
-                    {category}
+                    {category.name}
                   </Text>
                 </TouchableOpacity>
               );
@@ -252,14 +258,14 @@ export default function HomeScreen() {
                 <Text style={[styles.emptyTitle, { color: theme.text }]}>
                   {isDeletedView
                     ? 'No deleted items'
-                    : selectedCategory === 'All'
+                    : selectedCategoryId === 'All'
                     ? 'No items yet'
-                    : `No ${selectedCategory} items`}
+                    : `No ${selectedCategoryName} items`}
                 </Text>
                 <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                   {isDeletedView
                     ? 'Deleted items will appear here'
-                    : selectedCategory === 'All'
+                    : selectedCategoryId === 'All'
                     ? 'Tap "Add new item" below to get started'
                     : 'Try a different category or add a new item'}
                 </Text>
