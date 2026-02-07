@@ -13,7 +13,7 @@ import {
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '@/styles/commonStyles';
+import { getColors } from '@/styles/commonStyles';
 import { IconSymbol } from './IconSymbol';
 import { DEFAULT_CATEGORIES } from '@/types/LogItem';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -26,8 +26,8 @@ interface AddItemModalProps {
 }
 
 export function AddItemModal({ visible, onClose, onAdd, customCategories }: AddItemModalProps) {
-  const { effectiveColorScheme } = useTheme();
-  const theme = colors[effectiveColorScheme];
+  const { effectiveColorScheme, accentColor } = useTheme();
+  const theme = getColors(effectiveColorScheme, accentColor);
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(DEFAULT_CATEGORIES[0]);

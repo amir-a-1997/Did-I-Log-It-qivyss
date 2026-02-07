@@ -1,13 +1,13 @@
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useColorScheme, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { colors } from '@/styles/commonStyles';
+import { getColors } from '@/styles/commonStyles';
 import { LogItem } from '@/types/LogItem';
 import { formatLastLogged, getDaysAgo } from '@/utils/dateUtils';
 import { IconSymbol } from './IconSymbol';
-import { IconButton } from './IconButton';
 import * as Haptics from 'expo-haptics';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface SwipeableLogItemCardProps {
   item: LogItem;
@@ -17,8 +17,8 @@ interface SwipeableLogItemCardProps {
 }
 
 export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: SwipeableLogItemCardProps) {
-  const colorScheme = useColorScheme();
-  const theme = colors[colorScheme ?? 'light'];
+  const { effectiveColorScheme, accentColor } = useTheme();
+  const theme = getColors(effectiveColorScheme, accentColor);
   const [justLogged, setJustLogged] = useState(false);
 
   const lastLog = item.logs[0];
@@ -101,7 +101,7 @@ export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: Swipeab
               <View
                 style={[
                   styles.categoryBadge,
-                  { backgroundColor: colorScheme === 'dark' ? theme.primaryLight : theme.primaryLight },
+                  { backgroundColor: theme.primaryLight },
                 ]}
               >
                 <Text style={[styles.categoryText, { color: theme.primary }]}>{item.category}</Text>

@@ -1,7 +1,8 @@
 
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, useColorScheme } from 'react-native';
-import { colors } from '@/styles/commonStyles';
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import { getColors } from '@/styles/commonStyles';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface ConfirmModalProps {
   visible: boolean;
@@ -24,8 +25,8 @@ export function ConfirmModal({
   onCancel,
   destructive = false,
 }: ConfirmModalProps) {
-  const colorScheme = useColorScheme();
-  const theme = colors[colorScheme ?? 'light'];
+  const { effectiveColorScheme, accentColor } = useTheme();
+  const theme = getColors(effectiveColorScheme, accentColor);
 
   return (
     <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onCancel}>

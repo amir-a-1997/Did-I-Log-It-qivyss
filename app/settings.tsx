@@ -8,14 +8,14 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { colors } from '@/styles/commonStyles';
+import { getColors, accentColors } from '@/styles/commonStyles';
 import { useTheme } from '@/contexts/ThemeContext';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { themeMode, accentColor, effectiveColorScheme, setThemeMode, setAccentColor } = useTheme();
-  const theme = colors[effectiveColorScheme];
+  const theme = getColors(effectiveColorScheme, accentColor);
 
   const themeOptions: Array<{ value: 'system' | 'light' | 'dark'; label: string; description: string }> = [
     { value: 'system', label: 'System Default', description: 'Follow device settings' },
@@ -23,10 +23,10 @@ export default function SettingsScreen() {
     { value: 'dark', label: 'Dark', description: 'Always use dark mode' },
   ];
 
-  const accentOptions: Array<{ value: 'blue' | 'green' | 'purple'; label: string; color: string }> = [
-    { value: 'blue', label: 'Blue', color: '#3B82F6' },
-    { value: 'green', label: 'Green', color: '#10B981' },
-    { value: 'purple', label: 'Purple', color: '#8B5CF6' },
+  const accentOptions: Array<{ value: 'blue' | 'green' | 'purple'; label: string }> = [
+    { value: 'blue', label: 'Blue' },
+    { value: 'green', label: 'Green' },
+    { value: 'purple', label: 'Purple' },
   ];
 
   const handleThemeChange = (mode: 'system' | 'light' | 'dark') => {
@@ -96,6 +96,10 @@ export default function SettingsScreen() {
           <View style={styles.accentGrid}>
             {accentOptions.map((option) => {
               const isSelected = accentColor === option.value;
+              const colorValue = effectiveColorScheme === 'light' 
+                ? accentColors[option.value].light 
+                : accentColors[option.value].dark;
+              
               return (
                 <TouchableOpacity
                   key={option.value}
@@ -109,14 +113,14 @@ export default function SettingsScreen() {
                   <View
                     style={[
                       styles.accentColorCircle,
-                      { backgroundColor: option.color },
+                      { backgroundColor: colorValue },
                     ]}
                   />
                   <Text style={[styles.accentLabel, { color: theme.text }]}>
                     {option.label}
                   </Text>
                   {isSelected && (
-                    <View style={styles.accentCheckmark}>
+                    <View style={[styles.accentCheckmark, { backgroundColor: theme.success }]}>
                       <IconSymbol
                         ios_icon_name="checkmark"
                         android_material_icon_name="check"
@@ -136,7 +140,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.aboutRow}>
+          <View style={[styles.aboutRow, { borderBottomColor: theme.border }]}>
             <Text style={[styles.aboutLabel, { color: theme.textSecondary }]}>App Name</Text>
             <Text style={[styles.aboutValue, { color: theme.text }]}>Did I Log It?</Text>
           </View>
@@ -237,7 +241,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -247,7 +250,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   lastAboutRow: {
     borderBottomWidth: 0,

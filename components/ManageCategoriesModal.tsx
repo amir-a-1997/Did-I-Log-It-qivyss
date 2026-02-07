@@ -10,7 +10,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { colors } from '@/styles/commonStyles';
+import { getColors } from '@/styles/commonStyles';
 import { IconSymbol } from './IconSymbol';
 import { IconButton } from './IconButton';
 import { DEFAULT_CATEGORIES } from '@/types/LogItem';
@@ -33,8 +33,8 @@ export function ManageCategoriesModal({
   onRenameCategory,
   onDeleteCategory,
 }: ManageCategoriesModalProps) {
-  const { effectiveColorScheme } = useTheme();
-  const theme = colors[effectiveColorScheme];
+  const { effectiveColorScheme, accentColor } = useTheme();
+  const theme = getColors(effectiveColorScheme, accentColor);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');

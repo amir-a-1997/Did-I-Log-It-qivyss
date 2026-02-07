@@ -9,17 +9,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { colors } from '@/styles/commonStyles';
+import { getColors } from '@/styles/commonStyles';
 import { useLogItems } from '@/hooks/useLogItems';
 import { formatDateTime } from '@/utils/dateUtils';
 import { IconSymbol } from '@/components/IconSymbol';
-import { IconButton } from '@/components/IconButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function HistoryScreen() {
-  const { effectiveColorScheme } = useTheme();
-  const theme = colors[effectiveColorScheme];
+  const { effectiveColorScheme, accentColor } = useTheme();
+  const theme = getColors(effectiveColorScheme, accentColor);
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { items, loading, clearItemHistory } = useLogItems();

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { colors } from '@/styles/commonStyles';
+import { getColors } from '@/styles/commonStyles';
 import { useLogItems } from '@/hooks/useLogItems';
 import { SwipeableLogItemCard } from '@/components/SwipeableLogItemCard';
 import { AddItemModal } from '@/components/AddItemModal';
@@ -21,8 +21,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { IconButton } from '@/components/IconButton';
 
 export default function HomeScreen() {
-  const { effectiveColorScheme } = useTheme();
-  const theme = colors[effectiveColorScheme];
+  const { effectiveColorScheme, accentColor } = useTheme();
+  const theme = getColors(effectiveColorScheme, accentColor);
   const router = useRouter();
   const { items, loading, customCategories, addItem, logItem, softDeleteItem, restoreItem, deleteItem, addCategory, renameCategory, deleteCategory } = useLogItems();
 
@@ -36,10 +36,18 @@ export default function HomeScreen() {
   const [restoreModalVisible, setRestoreModalVisible] = useState(false);
   const [itemToRestore, setItemToRestore] = useState<{ id: string; title: string } | null>(null);
 
-  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
+  // Sort categories: "All" first, then normal categories sorted alphabetically, then "Deleted" last
+  const sortedCategories = useMemo(() => {
+    const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
+    const uniqueCategories = Array.from(new Set(allCategories));
+    const sortedNormalCategories = uniqueCategories.sort((a, b) => a.localeCompare(b));
+    
+    // Return: ["All", ...sorted normal categories, "Deleted"]
+    return ['All', ...sortedNormalCategories, 'Deleted'];
+  }, [customCategories]);
 
   // Filter items based on selected category
-  const filteredItems = (() => {
+  const filteredItems = useMemo(() => {
     if (selectedCategory === 'Deleted') {
       return items.filter((item) => item.isDeleted === true);
     }
@@ -51,7 +59,7 @@ export default function HomeScreen() {
     }
     
     return activeItems.filter((item) => item.category === selectedCategory);
-  })();
+  }, [items, selectedCategory]);
 
   const handleLogItem = (itemId: string) => {
     console.log('User tapped Log It button for item:', itemId);
@@ -168,53 +176,44 @@ export default function HomeScreen() {
             style={styles.filterScroll}
             contentContainerStyle={styles.filterContent}
           >
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor:
-                    selectedCategory === 'All' ? theme.primary : theme.card,
-                  borderColor: theme.border,
-                },
-              ]}
-              onPress={() => {
-                console.log('User selected filter: All');
-                setSelectedCategory('All');
-              }}
-            >
-              <Text
-                style={[
-                  styles.filterText,
-                  { color: selectedCategory === 'All' ? '#FFFFFF' : theme.text },
-                ]}
-              >
-                All
-              </Text>
-            </TouchableOpacity>
+            {sortedCategories.map((category) => {
+              const isSelected = category === selectedCategory;
+              const isDeleted = category === 'Deleted';
+              const isManage = category === 'Manage';
+              
+              // Special styling for "Deleted" chip
+              const chipBackgroundColor = isDeleted
+                ? (isSelected ? theme.danger : theme.card)
+                : (isSelected ? theme.primary : theme.card);
+              
+              const chipTextColor = isSelected ? '#FFFFFF' : theme.text;
 
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor:
-                    selectedCategory === 'Deleted' ? theme.danger : theme.card,
-                  borderColor: theme.border,
-                },
-              ]}
-              onPress={() => {
-                console.log('User selected filter: Deleted');
-                setSelectedCategory('Deleted');
-              }}
-            >
-              <Text
-                style={[
-                  styles.filterText,
-                  { color: selectedCategory === 'Deleted' ? '#FFFFFF' : theme.text },
-                ]}
-              >
-                Deleted
-              </Text>
-            </TouchableOpacity>
+              return (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.filterChip,
+                    {
+                      backgroundColor: chipBackgroundColor,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    console.log('User selected filter:', category);
+                    setSelectedCategory(category);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      { color: chipTextColor },
+                    ]}
+                  >
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
 
             <TouchableOpacity
               style={[
@@ -236,35 +235,6 @@ export default function HomeScreen() {
                 Manage
               </Text>
             </TouchableOpacity>
-
-            {allCategories.map((category) => {
-              const isSelected = category === selectedCategory;
-              return (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.filterChip,
-                    {
-                      backgroundColor: isSelected ? theme.primary : theme.card,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    console.log('User selected filter:', category);
-                    setSelectedCategory(category);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      { color: isSelected ? '#FFFFFF' : theme.text },
-                    ]}
-                  >
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
           </ScrollView>
 
           <ScrollView

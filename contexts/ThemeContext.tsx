@@ -23,6 +23,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemColorScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
   const [accentColor, setAccentColorState] = useState<AccentColor>('blue');
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load theme preferences from storage
   useEffect(() => {
@@ -36,15 +37,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       if (savedThemeMode) {
         setThemeModeState(savedThemeMode as ThemeMode);
-        console.log('Loaded theme mode:', savedThemeMode);
+        console.log('Loaded theme mode from storage:', savedThemeMode);
       }
 
       if (savedAccentColor) {
         setAccentColorState(savedAccentColor as AccentColor);
-        console.log('Loaded accent color:', savedAccentColor);
+        console.log('Loaded accent color from storage:', savedAccentColor);
       }
+      
+      setIsLoaded(true);
     } catch (error) {
       console.error('Error loading theme preferences:', error);
+      setIsLoaded(true);
     }
   };
 
@@ -53,6 +57,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeModeState(mode);
     try {
       await storage.setItem(THEME_MODE_KEY, mode);
+      console.log('Theme mode saved to storage:', mode);
     } catch (error) {
       console.error('Error saving theme mode:', error);
     }
@@ -63,6 +68,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setAccentColorState(color);
     try {
       await storage.setItem(ACCENT_COLOR_KEY, color);
+      console.log('Accent color saved to storage:', color);
     } catch (error) {
       console.error('Error saving accent color:', error);
     }
