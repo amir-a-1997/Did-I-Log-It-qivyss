@@ -12,8 +12,9 @@ import {
   Alert,
 } from 'react-native';
 import { colors } from '@/styles/commonStyles';
-import { DEFAULT_CATEGORIES } from '@/types/LogItem';
 import { IconSymbol } from './IconSymbol';
+import { IconButton } from './IconButton';
+import { DEFAULT_CATEGORIES } from '@/types/LogItem';
 
 interface ManageCategoriesModalProps {
   visible: boolean;
@@ -34,7 +35,6 @@ export function ManageCategoriesModal({
 }: ManageCategoriesModalProps) {
   const colorScheme = useColorScheme();
   const theme = colors[colorScheme ?? 'light'];
-
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');
@@ -49,23 +49,23 @@ export function ManageCategoriesModal({
   };
 
   const handleStartEdit = (categoryName: string) => {
-    console.log('User editing category:', categoryName);
+    console.log('User started editing category:', categoryName);
     setEditingCategory(categoryName);
     setEditedName(categoryName);
   };
 
   const handleSaveEdit = () => {
     const trimmedName = editedName.trim();
-    if (trimmedName && editingCategory) {
-      console.log('User renaming category:', editingCategory, 'to', trimmedName);
+    if (trimmedName && editingCategory && trimmedName !== editingCategory) {
+      console.log('User renamed category:', editingCategory, 'to', trimmedName);
       onRenameCategory(editingCategory, trimmedName);
-      setEditingCategory(null);
-      setEditedName('');
     }
+    setEditingCategory(null);
+    setEditedName('');
   };
 
   const handleCancelEdit = () => {
-    console.log('User cancelled edit');
+    console.log('User cancelled editing category');
     setEditingCategory(null);
     setEditedName('');
   };
@@ -90,287 +90,257 @@ export function ManageCategoriesModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Manage Categories</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <IconSymbol
-                ios_icon_name="xmark"
-                android_material_icon_name="close"
-                size={24}
-                color={theme.textSecondary}
-              />
-            </TouchableOpacity>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+          <Text style={[styles.title, { color: theme.text }]}>Manage Categories</Text>
+          <IconButton
+            onPress={onClose}
+            accessibilityLabel="Close"
+          >
+            <IconSymbol
+              ios_icon_name="xmark"
+              android_material_icon_name="close"
+              size={24}
+              color={theme.text}
+            />
+          </IconButton>
+        </View>
+
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Default Categories</Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+              These categories cannot be edited or deleted
+            </Text>
+            {DEFAULT_CATEGORIES.map((category) => (
+              <View
+                key={category}
+                style={[styles.categoryItem, { backgroundColor: theme.card, borderColor: theme.border }]}
+              >
+                <Text style={[styles.categoryName, { color: theme.text }]}>{category}</Text>
+                <View style={styles.defaultBadge}>
+                  <Text style={[styles.defaultBadgeText, { color: theme.textSecondary }]}>
+                    Default
+                  </Text>
+                </View>
+              </View>
+            ))}
           </View>
 
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Add New Category</Text>
-              <View style={styles.addCategoryRow}>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { backgroundColor: theme.background, color: theme.text, borderColor: theme.border },
-                  ]}
-                  placeholder="Category name"
-                  placeholderTextColor={theme.textSecondary}
-                  value={newCategoryName}
-                  onChangeText={setNewCategoryName}
-                  returnKeyType="done"
-                  onSubmitEditing={handleAddCategory}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.addButton,
-                    { backgroundColor: theme.primary },
-                    !newCategoryName.trim() && styles.buttonDisabled,
-                  ]}
-                  onPress={handleAddCategory}
-                  disabled={!newCategoryName.trim()}
-                >
-                  <IconSymbol
-                    ios_icon_name="plus"
-                    android_material_icon_name="add"
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                </TouchableOpacity>
-              </View>
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Custom Categories</Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+              Add your own categories
+            </Text>
+
+            <View style={[styles.addContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <TextInput
+                style={[styles.input, { color: theme.text }]}
+                placeholder="New category name"
+                placeholderTextColor={theme.textSecondary}
+                value={newCategoryName}
+                onChangeText={setNewCategoryName}
+                onSubmitEditing={handleAddCategory}
+              />
+              <TouchableOpacity
+                style={[styles.addButton, { backgroundColor: theme.primary }]}
+                onPress={handleAddCategory}
+              >
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Default Categories</Text>
-              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                Cannot be edited or deleted
-              </Text>
-              {DEFAULT_CATEGORIES.map((category) => (
+            {customCategories.length === 0 ? (
+              <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  No custom categories yet
+                </Text>
+              </View>
+            ) : (
+              customCategories.map((category) => (
                 <View
                   key={category}
-                  style={[styles.categoryRow, { backgroundColor: theme.background, borderColor: theme.border }]}
+                  style={[styles.categoryItem, { backgroundColor: theme.card, borderColor: theme.border }]}
                 >
-                  <Text style={[styles.categoryName, { color: theme.text }]}>{category}</Text>
-                  <View style={[styles.badge, { backgroundColor: theme.primaryLight }]}>
-                    <Text style={[styles.badgeText, { color: theme.primary }]}>Default</Text>
-                  </View>
+                  {editingCategory === category ? (
+                    <>
+                      <TextInput
+                        style={[styles.editInput, { color: theme.text, borderColor: theme.border }]}
+                        value={editedName}
+                        onChangeText={setEditedName}
+                        autoFocus
+                      />
+                      <View style={styles.editActions}>
+                        <TouchableOpacity
+                          style={[styles.editActionButton, { backgroundColor: theme.primary }]}
+                          onPress={handleSaveEdit}
+                        >
+                          <Text style={styles.editActionText}>Save</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.editActionButton, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
+                          onPress={handleCancelEdit}
+                        >
+                          <Text style={[styles.editActionText, { color: theme.text }]}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[styles.categoryName, { color: theme.text }]}>{category}</Text>
+                      <View style={styles.categoryActions}>
+                        <IconButton
+                          onPress={() => handleStartEdit(category)}
+                          accessibilityLabel="Edit category"
+                        >
+                          <IconSymbol
+                            ios_icon_name="pencil"
+                            android_material_icon_name="edit"
+                            size={20}
+                            color={theme.primary}
+                          />
+                        </IconButton>
+                        <IconButton
+                          onPress={() => handleDeleteCategory(category)}
+                          accessibilityLabel="Delete category"
+                        >
+                          <IconSymbol
+                            ios_icon_name="trash"
+                            android_material_icon_name="delete"
+                            size={20}
+                            color={theme.danger}
+                          />
+                        </IconButton>
+                      </View>
+                    </>
+                  )}
                 </View>
-              ))}
-            </View>
-
-            {customCategories.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Custom Categories</Text>
-                {customCategories.map((category) => (
-                  <View
-                    key={category}
-                    style={[styles.categoryRow, { backgroundColor: theme.background, borderColor: theme.border }]}
-                  >
-                    {editingCategory === category ? (
-                      <>
-                        <TextInput
-                          style={[
-                            styles.editInput,
-                            { backgroundColor: theme.card, color: theme.text, borderColor: theme.border },
-                          ]}
-                          value={editedName}
-                          onChangeText={setEditedName}
-                          autoFocus
-                        />
-                        <View style={styles.editActions}>
-                          <TouchableOpacity
-                            style={[styles.iconButton, { width: 44, height: 44 }]}
-                            onPress={handleSaveEdit}
-                          >
-                            <IconSymbol
-                              ios_icon_name="checkmark"
-                              android_material_icon_name="check"
-                              size={20}
-                              color={theme.primary}
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.iconButton, { width: 44, height: 44 }]}
-                            onPress={handleCancelEdit}
-                          >
-                            <IconSymbol
-                              ios_icon_name="xmark"
-                              android_material_icon_name="close"
-                              size={20}
-                              color={theme.textSecondary}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={[styles.categoryName, { color: theme.text }]}>{category}</Text>
-                        <View style={styles.categoryActions}>
-                          <TouchableOpacity
-                            style={[styles.iconButton, { width: 44, height: 44 }]}
-                            onPress={() => handleStartEdit(category)}
-                          >
-                            <IconSymbol
-                              ios_icon_name="pencil"
-                              android_material_icon_name="edit"
-                              size={20}
-                              color={theme.textSecondary}
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.iconButton, { width: 44, height: 44 }]}
-                            onPress={() => handleDeleteCategory(category)}
-                          >
-                            <IconSymbol
-                              ios_icon_name="trash"
-                              android_material_icon_name="delete"
-                              size={20}
-                              color={theme.danger}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                ))}
-              </View>
+              ))
             )}
-          </ScrollView>
-
-          <TouchableOpacity
-            style={[styles.doneButton, { backgroundColor: theme.primary }]}
-            onPress={onClose}
-          >
-            <Text style={[styles.doneButtonText, { color: '#FFFFFF' }]}>Done</Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        </ScrollView>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
   },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    maxHeight: '80%',
-  },
-  modalHeader: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 20,
-    marginBottom: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
   },
-  modalTitle: {
+  title: {
     fontSize: 20,
     fontWeight: '700',
   },
-  closeButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scrollView: {
-    maxHeight: 500,
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     marginBottom: 4,
   },
   sectionSubtitle: {
-    fontSize: 13,
-    marginBottom: 12,
+    fontSize: 14,
+    marginBottom: 16,
   },
-  addCategoryRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 15,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  categoryRow: {
+  categoryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
+    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 8,
   },
   categoryName: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     flex: 1,
   },
-  badge: {
+  defaultBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
-  badgeText: {
+  defaultBadgeText: {
     fontSize: 12,
     fontWeight: '600',
   },
   categoryActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  iconButton: {
+  addContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 8,
+  },
+  addButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyCard: {
+    padding: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
   },
   editInput: {
     flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 8,
-    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     marginRight: 8,
   },
   editActions: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 8,
   },
-  doneButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 16,
+  editActionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  doneButtonText: {
-    fontSize: 16,
+  editActionText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '600',
   },
 });

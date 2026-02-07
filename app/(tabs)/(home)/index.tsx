@@ -17,6 +17,7 @@ import { AddItemModal } from '@/components/AddItemModal';
 import { ManageCategoriesModal } from '@/components/ManageCategoriesModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { IconSymbol } from '@/components/IconSymbol';
+import { IconButton } from '@/components/IconButton';
 import { DEFAULT_CATEGORIES } from '@/types/LogItem';
 
 export default function HomeScreen() {
@@ -75,12 +76,12 @@ export default function HomeScreen() {
           title: 'Did I Log It?',
           headerRight: () => (
             <View style={styles.headerRightContainer}>
-              <TouchableOpacity
+              <IconButton
                 onPress={() => {
                   console.log('User tapped add button');
                   setAddModalVisible(true);
                 }}
-                style={styles.addButton}
+                accessibilityLabel="Add new item"
               >
                 <IconSymbol
                   ios_icon_name="plus"
@@ -88,7 +89,7 @@ export default function HomeScreen() {
                   size={24}
                   color={theme.primary}
                 />
-              </TouchableOpacity>
+              </IconButton>
             </View>
           ),
         }}
@@ -261,12 +262,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   filterScroll: {
     maxHeight: 60,

@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   useColorScheme,
+  ActivityIndicator,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
@@ -14,13 +15,14 @@ import { useLogItems } from '@/hooks/useLogItems';
 import { formatDateTime } from '@/utils/dateUtils';
 import { IconSymbol } from '@/components/IconSymbol';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { IconButton } from '@/components/IconButton';
 
 export default function HistoryScreen() {
   const colorScheme = useColorScheme();
   const theme = colors[colorScheme ?? 'light'];
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { items, deleteItem, deleteLog, clearItemHistory } = useLogItems();
+  const { items, loading, deleteItem, deleteLog, clearItemHistory } = useLogItems();
 
   const [deleteItemModalVisible, setDeleteItemModalVisible] = useState(false);
   const [clearHistoryModalVisible, setClearHistoryModalVisible] = useState(false);
@@ -29,14 +31,31 @@ export default function HistoryScreen() {
 
   const item = items.find((i) => i.id === id);
 
-  // If item is deleted, navigate back immediately
+  // Only navigate back if loading is complete and item is still not found
   useEffect(() => {
-    if (!item) {
-      console.log('Item not found, navigating back to home');
-      router.replace('/');
+    if (!loading && !item) {
+      console.log('Item not found after loading complete, navigating back to home');
+      router.back();
     }
-  }, [item, router]);
+  }, [item, loading, router]);
 
+  // Show loading state while data is being loaded
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <Stack.Screen
+          options={{
+            title: 'Loading...',
+          }}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  // If item not found after loading, show nothing (will navigate back)
   if (!item) {
     return null;
   }
@@ -47,7 +66,7 @@ export default function HistoryScreen() {
     // Delete the item
     await deleteItem(item.id);
     // Navigate back to home
-    router.replace('/');
+    router.back();
   };
 
   const handleClearHistory = async () => {
@@ -76,12 +95,12 @@ export default function HistoryScreen() {
           title: item.title,
           headerRight: () => (
             <View style={styles.headerRightContainer}>
-              <TouchableOpacity
+              <IconButton
                 onPress={() => {
                   console.log('User tapped delete item button');
                   setDeleteItemModalVisible(true);
                 }}
-                style={styles.headerButton}
+                accessibilityLabel="Delete item"
               >
                 <IconSymbol
                   ios_icon_name="trash"
@@ -89,7 +108,7 @@ export default function HistoryScreen() {
                   size={22}
                   color={theme.danger}
                 />
-              </TouchableOpacity>
+              </IconButton>
             </View>
           ),
         }}
@@ -171,13 +190,13 @@ export default function HistoryScreen() {
                         {formattedDate}
                       </Text>
                     </View>
-                    <TouchableOpacity
+                    <IconButton
                       onPress={() => {
                         console.log('User tapped delete log button');
                         setSelectedLogId(log.id);
                         setDeleteLogModalVisible(true);
                       }}
-                      style={styles.deleteLogButton}
+                      accessibilityLabel="Delete log entry"
                     >
                       <IconSymbol
                         ios_icon_name="trash"
@@ -185,7 +204,7 @@ export default function HistoryScreen() {
                         size={20}
                         color={theme.textSecondary}
                       />
-                    </TouchableOpacity>
+                    </IconButton>
                   </View>
                 </View>
               );
@@ -237,6 +256,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   scrollView: {
     flex: 1,
   },
@@ -248,12 +272,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   header: {
     padding: 20,
@@ -347,11 +365,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     flex: 1,
-  },
-  deleteLogButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

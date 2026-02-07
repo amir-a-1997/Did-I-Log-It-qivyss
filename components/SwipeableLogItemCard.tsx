@@ -6,6 +6,7 @@ import { colors } from '@/styles/commonStyles';
 import { LogItem } from '@/types/LogItem';
 import { formatLastLogged, getDaysAgo } from '@/utils/dateUtils';
 import { IconSymbol } from './IconSymbol';
+import { IconButton } from './IconButton';
 import * as Haptics from 'expo-haptics';
 
 interface SwipeableLogItemCardProps {
@@ -81,6 +82,8 @@ export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: Swipeab
     );
   };
 
+  const justLoggedText = 'Logged just now';
+
   return (
     <Swipeable
       renderRightActions={renderRightActions}
@@ -103,9 +106,15 @@ export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: Swipeab
               >
                 <Text style={[styles.categoryText, { color: theme.primary }]}>{item.category}</Text>
               </View>
-              <Text style={[styles.lastLogged, { color: getDaysColor() }]}>
-                {justLogged ? 'Logged just now' : lastLoggedText}
-              </Text>
+              {justLogged ? (
+                <Text style={[styles.lastLogged, { color: getDaysColor() }]}>
+                  {justLoggedText}
+                </Text>
+              ) : (
+                <Text style={[styles.lastLogged, { color: getDaysColor() }]}>
+                  {lastLoggedText}
+                </Text>
+              )}
             </View>
           </View>
           <TouchableOpacity
