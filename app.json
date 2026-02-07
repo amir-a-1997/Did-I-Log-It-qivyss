@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Did I Log It?",
-    "slug": "Did I Log It?",
+    "slug": "did-i-log-it",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/image.png",
@@ -36,7 +36,7 @@
       "expo-router",
       "expo-web-browser"
     ],
-    "scheme": "Did I Log It?",
+    "scheme": "DidILogIt?",
     "experiments": {
       "typedRoutes": true
     },
