@@ -14,24 +14,27 @@ import {
   Animated,
 } from 'react-native';
 import { colors } from '@/styles/commonStyles';
-import { Category, CATEGORIES } from '@/types/LogItem';
+import { DEFAULT_CATEGORIES } from '@/types/LogItem';
 import { IconSymbol } from './IconSymbol';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface AddItemModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (title: string, category: Category) => void;
+  onAdd: (title: string, category: string) => void;
+  customCategories: string[];
 }
 
-export function AddItemModal({ visible, onClose, onAdd }: AddItemModalProps) {
+export function AddItemModal({ visible, onClose, onAdd, customCategories }: AddItemModalProps) {
   const colorScheme = useColorScheme();
   const theme = colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
 
   const [title, setTitle] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<Category>('Home');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Home');
   const [slideAnim] = useState(new Animated.Value(-500));
+
+  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
 
   useEffect(() => {
     if (visible) {
@@ -136,7 +139,7 @@ export function AddItemModal({ visible, onClose, onAdd }: AddItemModalProps) {
                   <Text style={[styles.label, { color: theme.text }]}>Category</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={styles.categoryList}>
-                      {CATEGORIES.map((category) => {
+                      {allCategories.map((category) => {
                         const isSelected = category === selectedCategory;
                         return (
                           <TouchableOpacity
@@ -238,7 +241,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   closeButton: {
-    padding: 4,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

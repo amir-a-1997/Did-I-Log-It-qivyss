@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useColorScheme, Animated } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { colors } from '@/styles/commonStyles';
 import { LogItem } from '@/types/LogItem';
 import { formatLastLogged, getDaysAgo } from '@/utils/dateUtils';
 import { IconSymbol } from './IconSymbol';
-import Swipeable from 'react-native-gesture-handler/Swipeable';
+import * as Haptics from 'expo-haptics';
 
 interface SwipeableLogItemCardProps {
   item: LogItem;
@@ -21,34 +21,32 @@ export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: Swipeab
   const [justLogged, setJustLogged] = useState(false);
 
   const lastLog = item.logs[0];
-  const lastLoggedText = formatLastLogged(lastLog?.timestamp);
   const daysAgo = lastLog ? getDaysAgo(lastLog.timestamp) : null;
+  const lastLoggedText = lastLog ? formatLastLogged(lastLog.timestamp) : 'Never logged';
 
   const getDaysColor = () => {
-    if (daysAgo === null) return theme.textSecondary;
-    if (daysAgo === 0) return theme.success;
-    if (daysAgo <= 7) return theme.primary;
-    if (daysAgo <= 30) return theme.warning;
+    if (daysAgo === null) {
+      return theme.textSecondary;
+    }
+    if (daysAgo === 0) {
+      return theme.success;
+    }
+    if (daysAgo <= 7) {
+      return theme.primary;
+    }
+    if (daysAgo <= 30) {
+      return theme.warning;
+    }
     return theme.danger;
   };
 
-  const handleLogPress = async (e: any) => {
+  const handleLogPress = (e: any) => {
     e.stopPropagation();
     console.log('User tapped Log It button for:', item.title);
-    
-    // Trigger haptic feedback
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    // Show instant confirmation
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setJustLogged(true);
-    
-    // Call the log function
     onLog();
-    
-    // Reset the confirmation after 2 seconds
-    setTimeout(() => {
-      setJustLogged(false);
-    }, 2000);
+    setTimeout(() => setJustLogged(false), 2000);
   };
 
   const renderRightActions = (
@@ -65,9 +63,9 @@ export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: Swipeab
       <Animated.View style={[styles.deleteAction, { transform: [{ scale }] }]}>
         <TouchableOpacity
           style={[styles.deleteButton, { backgroundColor: theme.danger }]}
-          onPress={async () => {
-            console.log('User swiped to delete:', item.title);
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          onPress={() => {
+            console.log('User tapped swipe delete button for:', item.title);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             onDelete();
           }}
         >
@@ -83,15 +81,10 @@ export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: Swipeab
     );
   };
 
-  const displayText = justLogged ? 'Logged just now' : lastLoggedText;
-  const displayColor = justLogged ? theme.success : getDaysColor();
-
   return (
     <Swipeable
       renderRightActions={renderRightActions}
-      overshootRight={false}
-      friction={2}
-      rightThreshold={40}
+      onSwipeableOpen={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
     >
       <TouchableOpacity
         style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}
@@ -110,20 +103,15 @@ export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: Swipeab
               >
                 <Text style={[styles.categoryText, { color: theme.primary }]}>{item.category}</Text>
               </View>
-              <Text style={[styles.lastLogged, { color: displayColor }]}>{displayText}</Text>
+              <Text style={[styles.lastLogged, { color: getDaysColor() }]}>
+                {justLogged ? 'Logged just now' : lastLoggedText}
+              </Text>
             </View>
           </View>
-
           <TouchableOpacity
             style={[styles.logButton, { backgroundColor: theme.primary }]}
             onPress={handleLogPress}
           >
-            <IconSymbol
-              ios_icon_name="checkmark"
-              android_material_icon_name="check"
-              size={20}
-              color="#FFFFFF"
-            />
             <Text style={styles.logButtonText}>Log It</Text>
           </TouchableOpacity>
         </View>
@@ -135,19 +123,15 @@ export function SwipeableLogItemCard({ item, onLog, onPress, onDelete }: Swipeab
 const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    marginBottom: 12,
+    overflow: 'hidden',
   },
   cardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 16,
   },
   leftContent: {
     flex: 1,
@@ -177,12 +161,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   logButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 20,
-    gap: 6,
+    borderRadius: 8,
   },
   logButtonText: {
     color: '#FFFFFF',
@@ -199,8 +180,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 80,
     height: '100%',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
   },
   deleteText: {
     color: '#FFFFFF',

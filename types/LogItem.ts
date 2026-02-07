@@ -7,14 +7,16 @@ export interface LogEntry {
 export interface LogItem {
   id: string;
   title: string;
-  category: Category;
+  category: string; // Changed from Category type to string to support custom categories
   logs: LogEntry[];
   createdAt: string; // ISO 8601 format
 }
 
 export type Category = 'Home' | 'Car' | 'Family' | 'Personal' | 'Maintenance';
 
-export const CATEGORIES: Category[] = ['Home', 'Car', 'Family', 'Personal', 'Maintenance'];
+export const DEFAULT_CATEGORIES: Category[] = ['Home', 'Car', 'Family', 'Personal', 'Maintenance'];
+
+export const CATEGORIES: Category[] = DEFAULT_CATEGORIES; // Keep for backward compatibility
 
 export const CATEGORY_COLORS: Record<Category, { light: string; dark: string }> = {
   Home: { light: '#DBEAFE', dark: '#1E3A8A' },

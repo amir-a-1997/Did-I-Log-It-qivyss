@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,25 +29,31 @@ export default function HistoryScreen() {
 
   const item = items.find((i) => i.id === id);
 
+  // If item is deleted, navigate back immediately
+  useEffect(() => {
+    if (!item) {
+      console.log('Item not found, navigating back to home');
+      router.replace('/');
+    }
+  }, [item, router]);
+
   if (!item) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'History' }} />
-        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Item not found</Text>
-      </View>
-    );
+    return null;
   }
 
   const handleDeleteItem = async () => {
     console.log('User confirmed delete item:', item.title);
     setDeleteItemModalVisible(false);
+    // Delete the item
     await deleteItem(item.id);
-    router.back();
+    // Navigate back to home
+    router.replace('/');
   };
 
   const handleClearHistory = async () => {
     console.log('User confirmed clear ALL history for:', item.title);
     setClearHistoryModalVisible(false);
+    // Clear all log entries from persistent storage
     await clearItemHistory(item.id);
   };
 
@@ -202,7 +208,7 @@ export default function HistoryScreen() {
       <ConfirmModal
         visible={clearHistoryModalVisible}
         title="Clear History?"
-        message={`Are you sure you want to clear all log history for "${item.title}"? The item will be kept, but all ${item.logs.length} log entries will be deleted.`}
+        message={`Are you sure you want to clear all log history for "${item.title}"? The item will be kept, but all ${item.logs.length} log entries will be permanently deleted.`}
         confirmText="Clear History"
         cancelText="Cancel"
         destructive={true}
@@ -244,8 +250,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -343,8 +349,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   deleteLogButton: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,30 +1,42 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { storage } from '@/utils/storage';
 import { LogItem, LogEntry, Category } from '@/types/LogItem';
 
 const STORAGE_KEY = 'did_i_log_it_items';
+const CATEGORIES_KEY = 'did_i_log_it_categories';
 
 export function useLogItems() {
   const [items, setItems] = useState<LogItem[]>([]);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load items from storage
+  // Load items and categories from storage
   useEffect(() => {
-    loadItems();
+    loadData();
   }, []);
 
-  const loadItems = async () => {
+  const loadData = async () => {
     try {
-      console.log('Loading log items from storage');
-      const stored = await storage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
+      console.log('Loading log items and categories from storage');
+      
+      // Load items
+      const storedItems = await storage.getItem(STORAGE_KEY);
+      if (storedItems) {
+        const parsed = JSON.parse(storedItems);
         setItems(parsed);
         console.log('Loaded items:', parsed.length);
       }
+
+      // Load custom categories
+      const storedCategories = await storage.getItem(CATEGORIES_KEY);
+      if (storedCategories) {
+        const parsed = JSON.parse(storedCategories);
+        setCustomCategories(parsed);
+        console.log('Loaded custom categories:', parsed);
+      }
     } catch (error) {
-      console.error('Error loading items:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
@@ -40,7 +52,17 @@ export function useLogItems() {
     }
   };
 
-  const addItem = async (title: string, category: Category) => {
+  const saveCategories = async (categories: string[]) => {
+    try {
+      console.log('Saving custom categories to storage:', categories);
+      await storage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
+      setCustomCategories(categories);
+    } catch (error) {
+      console.error('Error saving categories:', error);
+    }
+  };
+
+  const addItem = async (title: string, category: string) => {
     console.log('Adding new item:', title, category);
     const newItem: LogItem = {
       id: Date.now().toString(),
@@ -64,11 +86,11 @@ export function useLogItems() {
     await saveItems(updatedItems);
   };
 
-  const deleteItem = async (itemId: string) => {
+  const deleteItem = useCallback(async (itemId: string) => {
     console.log('Deleting item and all history:', itemId);
     const updatedItems = items.filter((item) => item.id !== itemId);
     await saveItems(updatedItems);
-  };
+  }, [items]);
 
   const deleteLog = async (itemId: string, logId: string) => {
     console.log('Deleting log:', logId, 'from item:', itemId);
@@ -80,10 +102,51 @@ export function useLogItems() {
     await saveItems(updatedItems);
   };
 
-  const clearItemHistory = async (itemId: string) => {
+  const clearItemHistory = useCallback(async (itemId: string) => {
     console.log('Clearing ALL history for item:', itemId);
+    // Find the item and clear its logs
     const updatedItems = items.map((item) =>
       item.id === itemId ? { ...item, logs: [] } : item
+    );
+    // Save to persistent storage
+    await saveItems(updatedItems);
+    console.log('History cleared and saved to storage');
+  }, [items]);
+
+  const addCategory = async (categoryName: string) => {
+    console.log('Adding custom category:', categoryName);
+    if (!customCategories.includes(categoryName)) {
+      const updatedCategories = [...customCategories, categoryName];
+      await saveCategories(updatedCategories);
+    }
+  };
+
+  const renameCategory = async (oldName: string, newName: string) => {
+    console.log('Renaming category:', oldName, 'to', newName);
+    
+    // Update category list
+    const updatedCategories = customCategories.map((cat) =>
+      cat === oldName ? newName : cat
+    );
+    await saveCategories(updatedCategories);
+
+    // Update all items with this category
+    const updatedItems = items.map((item) =>
+      item.category === oldName ? { ...item, category: newName } : item
+    );
+    await saveItems(updatedItems);
+  };
+
+  const deleteCategory = async (categoryName: string) => {
+    console.log('Deleting category:', categoryName);
+    
+    // Remove from category list
+    const updatedCategories = customCategories.filter((cat) => cat !== categoryName);
+    await saveCategories(updatedCategories);
+
+    // Move items to "Uncategorised"
+    const updatedItems = items.map((item) =>
+      item.category === categoryName ? { ...item, category: 'Uncategorised' } : item
     );
     await saveItems(updatedItems);
   };
@@ -91,10 +154,14 @@ export function useLogItems() {
   return {
     items,
     loading,
+    customCategories,
     addItem,
     logItem,
     deleteItem,
     deleteLog,
     clearItemHistory,
+    addCategory,
+    renameCategory,
+    deleteCategory,
   };
 }

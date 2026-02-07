@@ -14,20 +14,24 @@ import { colors } from '@/styles/commonStyles';
 import { useLogItems } from '@/hooks/useLogItems';
 import { SwipeableLogItemCard } from '@/components/SwipeableLogItemCard';
 import { AddItemModal } from '@/components/AddItemModal';
+import { ManageCategoriesModal } from '@/components/ManageCategoriesModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { IconSymbol } from '@/components/IconSymbol';
-import { Category, CATEGORIES } from '@/types/LogItem';
+import { DEFAULT_CATEGORIES } from '@/types/LogItem';
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const theme = colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const { items, loading, addItem, logItem, deleteItem } = useLogItems();
+  const { items, loading, customCategories, addItem, logItem, deleteItem, addCategory, renameCategory, deleteCategory } = useLogItems();
 
   const [addModalVisible, setAddModalVisible] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
+  const [manageCategoriesVisible, setManageCategoriesVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
+
+  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
 
   const filteredItems =
     selectedCategory === 'All'
@@ -125,7 +129,29 @@ export default function HomeScreen() {
                 All
               </Text>
             </TouchableOpacity>
-            {CATEGORIES.map((category) => {
+
+            <TouchableOpacity
+              style={[
+                styles.manageChip,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+              onPress={() => {
+                console.log('User tapped Manage Categories');
+                setManageCategoriesVisible(true);
+              }}
+            >
+              <IconSymbol
+                ios_icon_name="gear"
+                android_material_icon_name="settings"
+                size={16}
+                color={theme.textSecondary}
+              />
+              <Text style={[styles.manageText, { color: theme.textSecondary }]}>
+                Manage
+              </Text>
+            </TouchableOpacity>
+
+            {allCategories.map((category) => {
               const isSelected = category === selectedCategory;
               return (
                 <TouchableOpacity
@@ -195,6 +221,16 @@ export default function HomeScreen() {
         visible={addModalVisible}
         onClose={() => setAddModalVisible(false)}
         onAdd={addItem}
+        customCategories={customCategories}
+      />
+
+      <ManageCategoriesModal
+        visible={manageCategoriesVisible}
+        onClose={() => setManageCategoriesVisible(false)}
+        customCategories={customCategories}
+        onAddCategory={addCategory}
+        onRenameCategory={renameCategory}
+        onDeleteCategory={deleteCategory}
       />
 
       <ConfirmModal
@@ -227,8 +263,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   addButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -248,8 +284,21 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
+  manageChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   filterText: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  manageText: {
+    fontSize: 13,
     fontWeight: '600',
   },
   scrollView: {
