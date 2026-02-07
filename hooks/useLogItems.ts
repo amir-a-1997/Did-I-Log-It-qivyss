@@ -215,19 +215,43 @@ export function useLogItems() {
     await saveItems(updatedItems);
   };
 
-  const deleteCategory = async (categoryName: string) => {
-    console.log('Deleting category:', categoryName);
+  const deleteCategory = useCallback(async (categoryName: string) => {
+    console.log('Permanently deleting category and all items in it:', categoryName);
     
-    // Remove from category list
-    const updatedCategories = customCategories.filter((cat) => cat !== categoryName);
-    await saveCategories(updatedCategories);
-
-    // Move items to "Uncategorised"
-    const updatedItems = items.map((item) =>
-      item.category === categoryName ? { ...item, category: 'Uncategorised' } : item
-    );
-    await saveItems(updatedItems);
-  };
+    // CRITICAL: Read from storage first to ensure we have the latest data (single source of truth)
+    const storedItems = await storage.getItem(STORAGE_KEY);
+    const currentItems = storedItems ? JSON.parse(storedItems) : [];
+    
+    const storedCategories = await storage.getItem(CATEGORIES_KEY);
+    const currentCategories = storedCategories ? JSON.parse(storedCategories) : [];
+    
+    console.log('Current items from storage before category deletion:', currentItems.length);
+    
+    // Find all items that belong to this category
+    const itemsToDelete = currentItems.filter((item: LogItem) => item.category === categoryName);
+    console.log('Items to permanently delete:', itemsToDelete.length);
+    
+    // Permanently delete all items in this category (including their logs)
+    const updatedItems = currentItems.filter((item: LogItem) => item.category !== categoryName);
+    
+    // Remove the category from the custom categories list
+    const updatedCategories = currentCategories.filter((cat: string) => cat !== categoryName);
+    
+    // Save both to persistent storage
+    await storage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
+    await storage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories));
+    
+    console.log('Category and all items permanently deleted and saved to storage');
+    
+    // Update in-memory state
+    setItems(updatedItems);
+    setCustomCategories(updatedCategories);
+    
+    // Verify the deletion by reading back from storage
+    const verifyItems = await storage.getItem(STORAGE_KEY);
+    const verifiedItems = verifyItems ? JSON.parse(verifyItems) : [];
+    console.log('Verified items after category deletion - total count:', verifiedItems.length);
+  }, []);
 
   return {
     items,

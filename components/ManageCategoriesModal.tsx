@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
 import { getColors } from '@/styles/commonStyles';
 import { IconSymbol } from './IconSymbol';
 import { IconButton } from './IconButton';
-import { DEFAULT_CATEGORIES } from '@/types/LogItem';
+import { DEFAULT_CATEGORIES, LogItem } from '@/types/LogItem';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmModal } from './ConfirmModal';
@@ -28,6 +28,7 @@ interface ManageCategoriesModalProps {
   onAddCategory: (name: string) => void;
   onRenameCategory: (oldName: string, newName: string) => void;
   onDeleteCategory: (name: string) => void;
+  items: LogItem[]; // Added to count items in a category
 }
 
 export function ManageCategoriesModal({
@@ -37,6 +38,7 @@ export function ManageCategoriesModal({
   onAddCategory,
   onRenameCategory,
   onDeleteCategory,
+  items,
 }: ManageCategoriesModalProps) {
   const { effectiveColorScheme, accentColor } = useTheme();
   const theme = getColors(effectiveColorScheme, accentColor);
@@ -50,6 +52,14 @@ export function ManageCategoriesModal({
   
   // Animation for sliding down from top
   const slideAnim = useRef(new Animated.Value(-1000)).current;
+
+  // Count items in the category to be deleted (excluding already deleted items)
+  const itemsInCategoryCount = useMemo(() => {
+    if (!categoryToDelete) {
+      return 0;
+    }
+    return items.filter((item) => item.category === categoryToDelete && !item.isDeleted).length;
+  }, [items, categoryToDelete]);
 
   useEffect(() => {
     if (visible) {
@@ -113,7 +123,7 @@ export function ManageCategoriesModal({
 
   const handleConfirmDelete = () => {
     if (categoryToDelete) {
-      console.log('Deleting category:', categoryToDelete);
+      console.log('User confirmed permanent deletion of category and all items:', categoryToDelete);
       onDeleteCategory(categoryToDelete);
       setCategoryToDelete(null);
     }
@@ -131,6 +141,11 @@ export function ManageCategoriesModal({
     Keyboard.dismiss();
     onClose();
   };
+
+  const deleteConfirmTitle = 'Delete Category and All Items?';
+  const deleteConfirmMessage = categoryToDelete
+    ? `This will permanently delete the category "${categoryToDelete}" and all ${itemsInCategoryCount} item${itemsInCategoryCount !== 1 ? 's' : ''} in it, along with their history. This action cannot be undone.`
+    : '';
 
   return (
     <>
@@ -349,9 +364,9 @@ export function ManageCategoriesModal({
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         visible={deleteConfirmVisible}
-        title="Delete Category"
-        message={`Delete "${categoryToDelete}"? Items in this category will be moved to "Uncategorised".`}
-        confirmText="Delete"
+        title={deleteConfirmTitle}
+        message={deleteConfirmMessage}
+        confirmText="Delete Permanently"
         cancelText="Cancel"
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}

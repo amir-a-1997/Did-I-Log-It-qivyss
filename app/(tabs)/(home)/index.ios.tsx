@@ -358,6 +358,7 @@ export default function HomeScreen() {
         onAddCategory={addCategory}
         onRenameCategory={renameCategory}
         onDeleteCategory={deleteCategory}
+        items={items}
       />
 
       <ConfirmModal
