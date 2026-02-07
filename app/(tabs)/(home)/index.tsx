@@ -12,8 +12,9 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { colors } from '@/styles/commonStyles';
 import { useLogItems } from '@/hooks/useLogItems';
-import { LogItemCard } from '@/components/LogItemCard';
+import { SwipeableLogItemCard } from '@/components/SwipeableLogItemCard';
 import { AddItemModal } from '@/components/AddItemModal';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { IconSymbol } from '@/components/IconSymbol';
 import { Category, CATEGORIES } from '@/types/LogItem';
 
@@ -21,10 +22,12 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const theme = colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const { items, loading, addItem, logItem } = useLogItems();
+  const { items, loading, addItem, logItem, deleteItem } = useLogItems();
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
 
   const filteredItems =
     selectedCategory === 'All'
@@ -38,6 +41,27 @@ export default function HomeScreen() {
   const handleItemPress = (itemId: string) => {
     console.log('User tapped item card, navigating to history:', itemId);
     router.push(`/history/${itemId}`);
+  };
+
+  const handleDeleteRequest = (itemId: string, itemTitle: string) => {
+    console.log('User requested delete for:', itemTitle);
+    setItemToDelete({ id: itemId, title: itemTitle });
+    setDeleteModalVisible(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (itemToDelete) {
+      console.log('User confirmed delete via swipe:', itemToDelete.title);
+      await deleteItem(itemToDelete.id);
+      setDeleteModalVisible(false);
+      setItemToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    console.log('User cancelled delete');
+    setDeleteModalVisible(false);
+    setItemToDelete(null);
   };
 
   return (
@@ -154,11 +178,12 @@ export default function HomeScreen() {
               </View>
             ) : (
               filteredItems.map((item) => (
-                <LogItemCard
+                <SwipeableLogItemCard
                   key={item.id}
                   item={item}
                   onLog={() => handleLogItem(item.id)}
                   onPress={() => handleItemPress(item.id)}
+                  onDelete={() => handleDeleteRequest(item.id, item.title)}
                 />
               ))
             )}
@@ -170,6 +195,17 @@ export default function HomeScreen() {
         visible={addModalVisible}
         onClose={() => setAddModalVisible(false)}
         onAdd={addItem}
+      />
+
+      <ConfirmModal
+        visible={deleteModalVisible}
+        title="Delete Item?"
+        message={itemToDelete ? `Are you sure you want to delete "${itemToDelete.title}" and all its history?` : ''}
+        confirmText="Delete"
+        cancelText="Cancel"
+        destructive={true}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
       />
     </View>
   );
@@ -191,7 +227,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   addButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },

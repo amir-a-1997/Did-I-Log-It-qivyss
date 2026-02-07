@@ -65,7 +65,7 @@ export function useLogItems() {
   };
 
   const deleteItem = async (itemId: string) => {
-    console.log('Deleting item:', itemId);
+    console.log('Deleting item and all history:', itemId);
     const updatedItems = items.filter((item) => item.id !== itemId);
     await saveItems(updatedItems);
   };
@@ -80,6 +80,14 @@ export function useLogItems() {
     await saveItems(updatedItems);
   };
 
+  const clearItemHistory = async (itemId: string) => {
+    console.log('Clearing ALL history for item:', itemId);
+    const updatedItems = items.map((item) =>
+      item.id === itemId ? { ...item, logs: [] } : item
+    );
+    await saveItems(updatedItems);
+  };
+
   return {
     items,
     loading,
@@ -87,5 +95,6 @@ export function useLogItems() {
     logItem,
     deleteItem,
     deleteLog,
+    clearItemHistory,
   };
 }

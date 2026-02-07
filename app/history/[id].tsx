@@ -20,7 +20,7 @@ export default function HistoryScreen() {
   const theme = colors[colorScheme ?? 'light'];
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { items, deleteItem, deleteLog } = useLogItems();
+  const { items, deleteItem, deleteLog, clearItemHistory } = useLogItems();
 
   const [deleteItemModalVisible, setDeleteItemModalVisible] = useState(false);
   const [clearHistoryModalVisible, setClearHistoryModalVisible] = useState(false);
@@ -38,30 +38,30 @@ export default function HistoryScreen() {
     );
   }
 
-  const handleDeleteItem = () => {
+  const handleDeleteItem = async () => {
     console.log('User confirmed delete item:', item.title);
-    deleteItem(item.id);
     setDeleteItemModalVisible(false);
+    await deleteItem(item.id);
     router.back();
   };
 
-  const handleClearHistory = () => {
-    console.log('User confirmed clear history for:', item.title);
-    // Delete all logs but keep the item
-    item.logs.forEach((log) => {
-      deleteLog(item.id, log.id);
-    });
+  const handleClearHistory = async () => {
+    console.log('User confirmed clear ALL history for:', item.title);
     setClearHistoryModalVisible(false);
+    await clearItemHistory(item.id);
   };
 
-  const handleDeleteLog = () => {
+  const handleDeleteLog = async () => {
     if (selectedLogId) {
       console.log('User confirmed delete log:', selectedLogId);
-      deleteLog(item.id, selectedLogId);
+      await deleteLog(item.id, selectedLogId);
       setDeleteLogModalVisible(false);
       setSelectedLogId(null);
     }
   };
+
+  const logCount = item.logs.length;
+  const logCountText = logCount === 0 ? 'No logs yet' : logCount === 1 ? '1 log entry' : `${logCount} log entries`;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -107,7 +107,7 @@ export default function HistoryScreen() {
             <View>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
               <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                {item.logs.length === 0 ? 'No logs yet' : `${item.logs.length} log entries`}
+                {logCountText}
               </Text>
             </View>
             {item.logs.length > 0 && (
@@ -140,45 +140,50 @@ export default function HistoryScreen() {
           </View>
         ) : (
           <View>
-            {item.logs.map((log, index) => (
-              <View
-                key={log.id}
-                style={[styles.logCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-              >
-                <View style={styles.logContent}>
-                  <View style={styles.logLeft}>
-                    <View
-                      style={[
-                        styles.logNumber,
-                        { backgroundColor: theme.primaryLight, borderColor: theme.primary },
-                      ]}
-                    >
-                      <Text style={[styles.logNumberText, { color: theme.primary }]}>
-                        {item.logs.length - index}
+            {item.logs.map((log, index) => {
+              const logNumber = item.logs.length - index;
+              const formattedDate = formatDateTime(log.timestamp);
+              
+              return (
+                <View
+                  key={log.id}
+                  style={[styles.logCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+                >
+                  <View style={styles.logContent}>
+                    <View style={styles.logLeft}>
+                      <View
+                        style={[
+                          styles.logNumber,
+                          { backgroundColor: theme.primaryLight, borderColor: theme.primary },
+                        ]}
+                      >
+                        <Text style={[styles.logNumberText, { color: theme.primary }]}>
+                          {logNumber}
+                        </Text>
+                      </View>
+                      <Text style={[styles.logDate, { color: theme.text }]}>
+                        {formattedDate}
                       </Text>
                     </View>
-                    <Text style={[styles.logDate, { color: theme.text }]}>
-                      {formatDateTime(log.timestamp)}
-                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        console.log('User tapped delete log button');
+                        setSelectedLogId(log.id);
+                        setDeleteLogModalVisible(true);
+                      }}
+                      style={styles.deleteLogButton}
+                    >
+                      <IconSymbol
+                        ios_icon_name="trash"
+                        android_material_icon_name="delete"
+                        size={20}
+                        color={theme.textSecondary}
+                      />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => {
-                      console.log('User tapped delete log button');
-                      setSelectedLogId(log.id);
-                      setDeleteLogModalVisible(true);
-                    }}
-                    style={styles.deleteLogButton}
-                  >
-                    <IconSymbol
-                      ios_icon_name="trash"
-                      android_material_icon_name="delete"
-                      size={20}
-                      color={theme.textSecondary}
-                    />
-                  </TouchableOpacity>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -197,7 +202,7 @@ export default function HistoryScreen() {
       <ConfirmModal
         visible={clearHistoryModalVisible}
         title="Clear History?"
-        message={`Are you sure you want to clear all log history for "${item.title}"? The item will be kept, but all log entries will be deleted.`}
+        message={`Are you sure you want to clear all log history for "${item.title}"? The item will be kept, but all ${item.logs.length} log entries will be deleted.`}
         confirmText="Clear History"
         cancelText="Cancel"
         destructive={true}
@@ -239,7 +244,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -337,7 +343,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   deleteLogButton: {
-    padding: 4,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
