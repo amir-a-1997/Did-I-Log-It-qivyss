@@ -8,6 +8,7 @@ export interface Category {
   categoryId: string; // Unique ID for category
   name: string;
   isDefault: boolean;
+  sortOrder?: number; // Optional sort order for display
 }
 
 export interface LogItem {
@@ -24,13 +25,13 @@ export type DefaultCategoryName = 'Home' | 'Car' | 'Family' | 'Personal' | 'Main
 
 export const DEFAULT_CATEGORY_NAMES: DefaultCategoryName[] = ['Home', 'Car', 'Family', 'Personal', 'Maintenance'];
 
-// Default categories with IDs
+// Default categories with IDs and sort order
 export const DEFAULT_CATEGORIES: Category[] = [
-  { categoryId: 'default-home', name: 'Home', isDefault: true },
-  { categoryId: 'default-car', name: 'Car', isDefault: true },
-  { categoryId: 'default-family', name: 'Family', isDefault: true },
-  { categoryId: 'default-personal', name: 'Personal', isDefault: true },
-  { categoryId: 'default-maintenance', name: 'Maintenance', isDefault: true },
+  { categoryId: 'default-home', name: 'Home', isDefault: true, sortOrder: 0 },
+  { categoryId: 'default-car', name: 'Car', isDefault: true, sortOrder: 1 },
+  { categoryId: 'default-family', name: 'Family', isDefault: true, sortOrder: 2 },
+  { categoryId: 'default-personal', name: 'Personal', isDefault: true, sortOrder: 3 },
+  { categoryId: 'default-maintenance', name: 'Maintenance', isDefault: true, sortOrder: 4 },
 ];
 
 export const CATEGORY_COLORS: Record<DefaultCategoryName, { light: string; dark: string }> = {

@@ -24,7 +24,7 @@ export default function HomeScreen() {
   const { effectiveColorScheme, accentColor } = useTheme();
   const theme = getColors(effectiveColorScheme, accentColor);
   const router = useRouter();
-  const { items, loading, customCategories, addItem, logItem, softDeleteItem, restoreItem, deleteItem, addCategory, renameCategory, deleteCategory } = useLogItems();
+  const { items, loading, categories, addItem, logItem, softDeleteItem, restoreItem, deleteItem, addCategory, renameCategory, deleteCategory } = useLogItems();
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [manageCategoriesVisible, setManageCategoriesVisible] = useState(false);
@@ -37,14 +37,15 @@ export default function HomeScreen() {
   const [itemToRestore, setItemToRestore] = useState<{ id: string; title: string } | null>(null);
 
   // Combine all categories with "All" and "Deleted" options
+  // SINGLE SOURCE OF TRUTH: Categories come from the hook which reads from storage
   const allCategoriesForFilter = useMemo(() => {
-    const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
+    const allCategories = [...DEFAULT_CATEGORIES, ...categories];
     return [
-      { categoryId: 'All', name: 'All', isDefault: false },
+      { categoryId: 'All', name: 'All', isDefault: false, sortOrder: -2 },
       ...allCategories,
-      { categoryId: 'Deleted', name: 'Deleted', isDefault: false },
+      { categoryId: 'Deleted', name: 'Deleted', isDefault: false, sortOrder: 9999 },
     ];
-  }, [customCategories]);
+  }, [categories]);
 
   // Filter items based on selected category
   const filteredItems = useMemo(() => {
@@ -354,13 +355,13 @@ export default function HomeScreen() {
         visible={addModalVisible}
         onClose={() => setAddModalVisible(false)}
         onAdd={addItem}
-        customCategories={customCategories}
+        categories={categories}
       />
 
       <ManageCategoriesModal
         visible={manageCategoriesVisible}
         onClose={() => setManageCategoriesVisible(false)}
-        customCategories={customCategories}
+        categories={categories}
         onAddCategory={addCategory}
         onRenameCategory={renameCategory}
         onDeleteCategory={deleteCategory}

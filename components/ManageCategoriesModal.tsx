@@ -25,7 +25,7 @@ import Toast from 'react-native-toast-message';
 interface ManageCategoriesModalProps {
   visible: boolean;
   onClose: () => void;
-  customCategories: Category[];
+  categories: Category[]; // Custom categories from the hook
   onAddCategory: (name: string) => void;
   onRenameCategory: (categoryId: string, newName: string) => void;
   onDeleteCategory: (categoryId: string) => Promise<boolean>;
@@ -35,7 +35,7 @@ interface ManageCategoriesModalProps {
 export function ManageCategoriesModal({
   visible,
   onClose,
-  customCategories,
+  categories,
   onAddCategory,
   onRenameCategory,
   onDeleteCategory,
@@ -303,13 +303,13 @@ export function ManageCategoriesModal({
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>
                       Custom Categories
                     </Text>
-                    {customCategories.length === 0 ? (
+                    {categories.length === 0 ? (
                       <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                         No custom categories yet
                       </Text>
                     ) : (
                       <>
-                        {customCategories.map((category) => (
+                        {categories.map((category) => (
                           <View
                             key={category.categoryId}
                             style={[

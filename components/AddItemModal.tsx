@@ -22,14 +22,14 @@ interface AddItemModalProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (title: string, categoryId: string) => void;
-  customCategories: Category[];
+  categories: Category[]; // Custom categories from the hook
 }
 
 export function AddItemModal({
   visible,
   onClose,
   onAdd,
-  customCategories,
+  categories,
 }: AddItemModalProps) {
   const { effectiveColorScheme, accentColor } = useTheme();
   const theme = getColors(effectiveColorScheme, accentColor);
@@ -63,7 +63,8 @@ export function AddItemModal({
     onClose();
   };
 
-  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
+  // SINGLE SOURCE OF TRUTH: Combine default categories with custom categories from storage
+  const allCategories = [...DEFAULT_CATEGORIES, ...categories];
 
   return (
     <Modal
