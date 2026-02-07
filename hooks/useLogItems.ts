@@ -88,9 +88,12 @@ export function useLogItems() {
 
   const deleteItem = useCallback(async (itemId: string) => {
     console.log('Deleting item and all history:', itemId);
-    const updatedItems = items.filter((item) => item.id !== itemId);
+    // Read from storage to ensure we have the latest data
+    const storedItems = await storage.getItem(STORAGE_KEY);
+    const currentItems = storedItems ? JSON.parse(storedItems) : [];
+    const updatedItems = currentItems.filter((item: LogItem) => item.id !== itemId);
     await saveItems(updatedItems);
-  }, [items]);
+  }, []);
 
   const deleteLog = async (itemId: string, logId: string) => {
     console.log('Deleting log:', logId, 'from item:', itemId);
@@ -104,14 +107,31 @@ export function useLogItems() {
 
   const clearItemHistory = useCallback(async (itemId: string) => {
     console.log('Clearing ALL history for item:', itemId);
-    // Find the item and clear its logs
-    const updatedItems = items.map((item) =>
+    
+    // CRITICAL: Read from storage first to ensure we have the latest data
+    const storedItems = await storage.getItem(STORAGE_KEY);
+    const currentItems = storedItems ? JSON.parse(storedItems) : [];
+    
+    console.log('Current items from storage before clear:', currentItems.length);
+    
+    // Find the item and clear its logs array
+    const updatedItems = currentItems.map((item: LogItem) =>
       item.id === itemId ? { ...item, logs: [] } : item
     );
+    
     // Save to persistent storage
-    await saveItems(updatedItems);
-    console.log('History cleared and saved to storage');
-  }, [items]);
+    await storage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
+    console.log('History cleared and saved to storage for item:', itemId);
+    
+    // Update in-memory state
+    setItems(updatedItems);
+    
+    // Verify the clear by reading back from storage
+    const verifyItems = await storage.getItem(STORAGE_KEY);
+    const verifiedItems = verifyItems ? JSON.parse(verifyItems) : [];
+    const verifiedItem = verifiedItems.find((item: LogItem) => item.id === itemId);
+    console.log('Verified item after clear - logs count:', verifiedItem?.logs.length || 0);
+  }, []);
 
   const addCategory = async (categoryName: string) => {
     console.log('Adding custom category:', categoryName);

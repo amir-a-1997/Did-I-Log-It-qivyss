@@ -22,9 +22,8 @@ export default function HistoryScreen() {
   const theme = colors[colorScheme ?? 'light'];
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { items, loading, deleteItem, deleteLog, clearItemHistory } = useLogItems();
+  const { items, loading, deleteLog, clearItemHistory } = useLogItems();
 
-  const [deleteItemModalVisible, setDeleteItemModalVisible] = useState(false);
   const [clearHistoryModalVisible, setClearHistoryModalVisible] = useState(false);
   const [deleteLogModalVisible, setDeleteLogModalVisible] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
@@ -60,15 +59,6 @@ export default function HistoryScreen() {
     return null;
   }
 
-  const handleDeleteItem = async () => {
-    console.log('User confirmed delete item:', item.title);
-    setDeleteItemModalVisible(false);
-    // Delete the item
-    await deleteItem(item.id);
-    // Navigate back to home
-    router.back();
-  };
-
   const handleClearHistory = async () => {
     console.log('User confirmed clear ALL history for:', item.title);
     setClearHistoryModalVisible(false);
@@ -93,24 +83,6 @@ export default function HistoryScreen() {
       <Stack.Screen
         options={{
           title: item.title,
-          headerRight: () => (
-            <View style={styles.headerRightContainer}>
-              <IconButton
-                onPress={() => {
-                  console.log('User tapped delete item button');
-                  setDeleteItemModalVisible(true);
-                }}
-                accessibilityLabel="Delete item"
-              >
-                <IconSymbol
-                  ios_icon_name="trash"
-                  android_material_icon_name="delete"
-                  size={22}
-                  color={theme.danger}
-                />
-              </IconButton>
-            </View>
-          ),
         }}
       />
 
@@ -214,17 +186,6 @@ export default function HistoryScreen() {
       </ScrollView>
 
       <ConfirmModal
-        visible={deleteItemModalVisible}
-        title="Delete Item?"
-        message={`Are you sure you want to delete "${item.title}"? This will permanently remove the item and all its log history.`}
-        confirmText="Delete Item"
-        cancelText="Cancel"
-        destructive={true}
-        onConfirm={handleDeleteItem}
-        onCancel={() => setDeleteItemModalVisible(false)}
-      />
-
-      <ConfirmModal
         visible={clearHistoryModalVisible}
         title="Clear History?"
         message={`Are you sure you want to clear all log history for "${item.title}"? The item will be kept, but all ${item.logs.length} log entries will be permanently deleted.`}
@@ -266,12 +227,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-  },
-  headerRightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
   },
   header: {
     padding: 20,

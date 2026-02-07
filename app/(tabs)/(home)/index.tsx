@@ -75,22 +75,20 @@ export default function HomeScreen() {
         options={{
           title: 'Did I Log It?',
           headerRight: () => (
-            <View style={styles.headerRightContainer}>
-              <IconButton
-                onPress={() => {
-                  console.log('User tapped add button');
-                  setAddModalVisible(true);
-                }}
-                accessibilityLabel="Add new item"
-              >
-                <IconSymbol
-                  ios_icon_name="plus"
-                  android_material_icon_name="add"
-                  size={24}
-                  color={theme.primary}
-                />
-              </IconButton>
-            </View>
+            <IconButton
+              onPress={() => {
+                console.log('User tapped add button');
+                setAddModalVisible(true);
+              }}
+              accessibilityLabel="Add new item"
+            >
+              <IconSymbol
+                ios_icon_name="plus"
+                android_material_icon_name="add"
+                size={24}
+                color={theme.primary}
+              />
+            </IconButton>
           ),
         }}
       />
@@ -256,12 +254,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  headerRightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
   },
   filterScroll: {
     maxHeight: 60,
