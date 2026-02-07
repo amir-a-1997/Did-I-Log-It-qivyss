@@ -31,6 +31,22 @@ export const colors = {
   },
 };
 
+// Accent color variants
+export const accentColors = {
+  blue: {
+    light: '#3B82F6',
+    dark: '#60A5FA',
+  },
+  green: {
+    light: '#10B981',
+    dark: '#34D399',
+  },
+  purple: {
+    light: '#8B5CF6',
+    dark: '#A78BFA',
+  },
+};
+
 export const commonStyles = StyleSheet.create({
   container: {
     flex: 1,

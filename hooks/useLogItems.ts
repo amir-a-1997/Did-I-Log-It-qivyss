@@ -70,6 +70,7 @@ export function useLogItems() {
       category,
       logs: [],
       createdAt: new Date().toISOString(),
+      isDeleted: false,
     };
     await saveItems([...items, newItem]);
   };
@@ -108,8 +109,38 @@ export function useLogItems() {
     console.log('Verified item after logging - logs count:', verifiedItem?.logs.length || 0);
   }, []);
 
+  const softDeleteItem = useCallback(async (itemId: string) => {
+    console.log('Soft deleting item (marking as deleted):', itemId);
+    
+    // Read from storage to ensure we have the latest data
+    const storedItems = await storage.getItem(STORAGE_KEY);
+    const currentItems = storedItems ? JSON.parse(storedItems) : [];
+    
+    const updatedItems = currentItems.map((item: LogItem) =>
+      item.id === itemId ? { ...item, isDeleted: true } : item
+    );
+    
+    await saveItems(updatedItems);
+    console.log('Item marked as deleted:', itemId);
+  }, []);
+
+  const restoreItem = useCallback(async (itemId: string) => {
+    console.log('Restoring item (unmarking as deleted):', itemId);
+    
+    // Read from storage to ensure we have the latest data
+    const storedItems = await storage.getItem(STORAGE_KEY);
+    const currentItems = storedItems ? JSON.parse(storedItems) : [];
+    
+    const updatedItems = currentItems.map((item: LogItem) =>
+      item.id === itemId ? { ...item, isDeleted: false } : item
+    );
+    
+    await saveItems(updatedItems);
+    console.log('Item restored:', itemId);
+  }, []);
+
   const deleteItem = useCallback(async (itemId: string) => {
-    console.log('Deleting item and all history:', itemId);
+    console.log('Permanently deleting item and all history:', itemId);
     // Read from storage to ensure we have the latest data
     const storedItems = await storage.getItem(STORAGE_KEY);
     const currentItems = storedItems ? JSON.parse(storedItems) : [];
@@ -204,6 +235,8 @@ export function useLogItems() {
     customCategories,
     addItem,
     logItem,
+    softDeleteItem,
+    restoreItem,
     deleteItem,
     deleteLog,
     clearItemHistory,

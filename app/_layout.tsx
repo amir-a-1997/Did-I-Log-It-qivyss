@@ -1,3 +1,4 @@
+
 import "react-native-reanimated";
 import React, { useEffect } from "react";
 import { useFonts } from "expo-font";
@@ -11,10 +12,11 @@ import {
   DarkTheme,
   DefaultTheme,
   Theme,
-  ThemeProvider,
+  ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { WidgetProvider } from "@/contexts/WidgetContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 // Note: Error logging is auto-initialized via index.ts import
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -80,19 +82,23 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="auto" animated />
-        <ThemeProvider
+      <ThemeProvider>
+        <NavigationThemeProvider
           value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
         >
           <WidgetProvider>
             <GestureHandlerRootView>
-            <Stack>
-              {/* Main app with tabs */}
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            </Stack>
-            <SystemBars style={"auto"} />
+              <Stack>
+                {/* Main app with tabs */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                {/* Settings screen */}
+                <Stack.Screen name="settings" options={{ headerShown: true }} />
+              </Stack>
+              <SystemBars style={"auto"} />
             </GestureHandlerRootView>
           </WidgetProvider>
-        </ThemeProvider>
+        </NavigationThemeProvider>
+      </ThemeProvider>
     </>
   );
 }

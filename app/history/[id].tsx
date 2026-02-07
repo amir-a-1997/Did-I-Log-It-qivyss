@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  useColorScheme,
   ActivityIndicator,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,39 +13,31 @@ import { colors } from '@/styles/commonStyles';
 import { useLogItems } from '@/hooks/useLogItems';
 import { formatDateTime } from '@/utils/dateUtils';
 import { IconSymbol } from '@/components/IconSymbol';
-import { ConfirmModal } from '@/components/ConfirmModal';
 import { IconButton } from '@/components/IconButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function HistoryScreen() {
-  const colorScheme = useColorScheme();
-  const theme = colors[colorScheme ?? 'light'];
-  const router = useRouter();
+  const { effectiveColorScheme } = useTheme();
+  const theme = colors[effectiveColorScheme];
   const { id } = useLocalSearchParams();
-  const { items, loading, deleteLog, clearItemHistory } = useLogItems();
-
-  const [clearHistoryModalVisible, setClearHistoryModalVisible] = useState(false);
-  const [deleteLogModalVisible, setDeleteLogModalVisible] = useState(false);
-  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const router = useRouter();
+  const { items, loading, clearItemHistory } = useLogItems();
+  const [clearModalVisible, setClearModalVisible] = useState(false);
 
   const item = items.find((i) => i.id === id);
 
-  // Only navigate back if loading is complete and item is still not found
   useEffect(() => {
     if (!loading && !item) {
-      console.log('Item not found after loading complete, navigating back to home');
+      console.log('Item not found, navigating back to home');
       router.back();
     }
   }, [item, loading, router]);
 
-  // Show loading state while data is being loaded
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Stack.Screen
-          options={{
-            title: 'Loading...',
-          }}
-        />
+        <Stack.Screen options={{ title: 'Loading...' }} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
         </View>
@@ -54,76 +45,89 @@ export default function HistoryScreen() {
     );
   }
 
-  // If item not found after loading, show nothing (will navigate back)
   if (!item) {
     return null;
   }
 
-  const handleClearHistory = async () => {
-    console.log('User confirmed clear ALL history for:', item.title);
-    setClearHistoryModalVisible(false);
-    // Clear all log entries from persistent storage
-    await clearItemHistory(item.id);
+  const handleClearHistory = () => {
+    console.log('User tapped Clear History button');
+    setClearModalVisible(true);
   };
 
   const handleDeleteLog = async () => {
-    if (selectedLogId) {
-      console.log('User confirmed delete log:', selectedLogId);
-      await deleteLog(item.id, selectedLogId);
-      setDeleteLogModalVisible(false);
-      setSelectedLogId(null);
-    }
+    console.log('User confirmed Clear History');
+    await clearItemHistory(item.id);
+    setClearModalVisible(false);
   };
 
-  const logCount = item.logs.length;
-  const logCountText = logCount === 0 ? 'No logs yet' : logCount === 1 ? '1 log entry' : `${logCount} log entries`;
+  const sortedLogs = [...item.logs].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+
+  const lastLoggedText = item.logs.length > 0 ? formatDateTime(item.logs[0].timestamp) : 'Never logged';
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Stack.Screen
         options={{
           title: item.title,
+          headerBackTitle: 'Back',
         }}
       />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.header, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
-          <View
-            style={[
-              styles.categoryBadge,
-              { backgroundColor: colorScheme === 'dark' ? theme.primaryLight : theme.primaryLight },
-            ]}
+        <View style={[styles.summaryCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Category
+            </Text>
+            <Text style={[styles.summaryValue, { color: theme.text }]}>
+              {item.category}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Last Logged
+            </Text>
+            <Text style={[styles.summaryValue, { color: theme.text }]}>
+              {lastLoggedText}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Total Logs
+            </Text>
+            <Text style={[styles.summaryValue, { color: theme.text }]}>
+              {item.logs.length}
+            </Text>
+          </View>
+        </View>
+
+        {item.logs.length > 0 && (
+          <TouchableOpacity
+            style={[styles.clearButton, { backgroundColor: theme.danger }]}
+            onPress={handleClearHistory}
           >
-            <Text style={[styles.categoryText, { color: theme.primary }]}>{item.category}</Text>
-          </View>
+            <IconSymbol
+              ios_icon_name="trash"
+              android_material_icon_name="delete"
+              size={20}
+              color="#FFFFFF"
+            />
+            <Text style={styles.clearButtonText}>Clear History</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={styles.historySection}>
+          <Text style={[styles.historyTitle, { color: theme.text }]}>
+            History
+          </Text>
+          <Text style={[styles.historyCount, { color: theme.textSecondary }]}>
+            {item.logs.length} log entries
+          </Text>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
-              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                {logCountText}
-              </Text>
-            </View>
-            {item.logs.length > 0 && (
-              <TouchableOpacity
-                onPress={() => {
-                  console.log('User tapped clear history button');
-                  setClearHistoryModalVisible(true);
-                }}
-                style={[styles.clearButton, { backgroundColor: theme.card, borderColor: theme.border }]}
-              >
-                <Text style={[styles.clearButtonText, { color: theme.textSecondary }]}>
-                  Clear History
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {item.logs.length === 0 ? (
+        {sortedLogs.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <IconSymbol
               ios_icon_name="clock"
@@ -131,83 +135,48 @@ export default function HistoryScreen() {
               size={48}
               color={theme.textSecondary}
             />
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              No history yet
+            </Text>
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              No logs yet. Tap &quot;Log It&quot; to record when you complete this task.
+              Tap "Log It" to record when you complete this task
             </Text>
           </View>
         ) : (
-          <View>
-            {item.logs.map((log, index) => {
-              const logNumber = item.logs.length - index;
-              const formattedDate = formatDateTime(log.timestamp);
-              
-              return (
-                <View
-                  key={log.id}
-                  style={[styles.logCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-                >
-                  <View style={styles.logContent}>
-                    <View style={styles.logLeft}>
-                      <View
-                        style={[
-                          styles.logNumber,
-                          { backgroundColor: theme.primaryLight, borderColor: theme.primary },
-                        ]}
-                      >
-                        <Text style={[styles.logNumberText, { color: theme.primary }]}>
-                          {logNumber}
-                        </Text>
-                      </View>
-                      <Text style={[styles.logDate, { color: theme.text }]}>
-                        {formattedDate}
-                      </Text>
-                    </View>
-                    <IconButton
-                      onPress={() => {
-                        console.log('User tapped delete log button');
-                        setSelectedLogId(log.id);
-                        setDeleteLogModalVisible(true);
-                      }}
-                      accessibilityLabel="Delete log entry"
-                    >
-                      <IconSymbol
-                        ios_icon_name="trash"
-                        android_material_icon_name="delete"
-                        size={20}
-                        color={theme.textSecondary}
-                      />
-                    </IconButton>
-                  </View>
+          sortedLogs.map((log, index) => {
+            const logDate = formatDateTime(log.timestamp);
+            return (
+              <View
+                key={log.id}
+                style={[
+                  styles.logCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                ]}
+              >
+                <View style={[styles.logIndicator, { backgroundColor: theme.primary }]} />
+                <View style={styles.logContent}>
+                  <Text style={[styles.logDate, { color: theme.text }]}>
+                    {logDate}
+                  </Text>
+                  <Text style={[styles.logIndex, { color: theme.textSecondary }]}>
+                    Entry #{sortedLogs.length - index}
+                  </Text>
                 </View>
-              );
-            })}
-          </View>
+              </View>
+            );
+          })
         )}
       </ScrollView>
 
       <ConfirmModal
-        visible={clearHistoryModalVisible}
+        visible={clearModalVisible}
         title="Clear History?"
-        message={`Are you sure you want to clear all log history for "${item.title}"? The item will be kept, but all ${item.logs.length} log entries will be permanently deleted.`}
+        message={`This will permanently delete all ${item.logs.length} log entries for "${item.title}". This cannot be undone.`}
         confirmText="Clear History"
         cancelText="Cancel"
         destructive={true}
-        onConfirm={handleClearHistory}
-        onCancel={() => setClearHistoryModalVisible(false)}
-      />
-
-      <ConfirmModal
-        visible={deleteLogModalVisible}
-        title="Delete Log Entry?"
-        message="Are you sure you want to delete this log entry?"
-        confirmText="Delete"
-        cancelText="Cancel"
-        destructive={true}
         onConfirm={handleDeleteLog}
-        onCancel={() => {
-          setDeleteLogModalVisible(false);
-          setSelectedLogId(null);
-        }}
+        onCancel={() => setClearModalVisible(false)}
       />
     </View>
   );
@@ -227,98 +196,92 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 32,
   },
-  header: {
-    padding: 20,
+  summaryCard: {
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 24,
-  },
-  itemTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  categoryText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  section: {
+    padding: 16,
     marginBottom: 16,
   },
-  sectionHeader: {
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 10,
   },
-  sectionTitle: {
-    fontSize: 18,
+  summaryLabel: {
+    fontSize: 15,
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 24,
+    gap: 8,
+  },
+  clearButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  historySection: {
+    marginBottom: 16,
+  },
+  historyTitle: {
+    fontSize: 20,
     fontWeight: '700',
     marginBottom: 4,
   },
-  sectionSubtitle: {
+  historyCount: {
     fontSize: 14,
-  },
-  clearButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  clearButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   emptyCard: {
     padding: 40,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
+    marginTop: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptyText: {
     fontSize: 15,
     textAlign: 'center',
-    marginTop: 16,
     lineHeight: 22,
   },
   logCard: {
-    padding: 16,
+    flexDirection: 'row',
     borderRadius: 12,
     borderWidth: 1,
+    padding: 16,
     marginBottom: 12,
   },
-  logContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  logLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  logNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logIndicator: {
+    width: 4,
+    borderRadius: 2,
     marginRight: 12,
   },
-  logNumberText: {
-    fontSize: 14,
-    fontWeight: '700',
+  logContent: {
+    flex: 1,
   },
   logDate: {
-    fontSize: 15,
-    fontWeight: '500',
-    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  logIndex: {
+    fontSize: 14,
   },
 });

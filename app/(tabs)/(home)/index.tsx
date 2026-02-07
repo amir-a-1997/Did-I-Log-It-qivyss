@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  useColorScheme,
   ActivityIndicator,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
@@ -18,25 +17,41 @@ import { ManageCategoriesModal } from '@/components/ManageCategoriesModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { IconSymbol } from '@/components/IconSymbol';
 import { DEFAULT_CATEGORIES } from '@/types/LogItem';
+import { useTheme } from '@/contexts/ThemeContext';
+import { IconButton } from '@/components/IconButton';
 
 export default function HomeScreen() {
-  const colorScheme = useColorScheme();
-  const theme = colors[colorScheme ?? 'light'];
+  const { effectiveColorScheme } = useTheme();
+  const theme = colors[effectiveColorScheme];
   const router = useRouter();
-  const { items, loading, customCategories, addItem, logItem, deleteItem, addCategory, renameCategory, deleteCategory } = useLogItems();
+  const { items, loading, customCategories, addItem, logItem, softDeleteItem, restoreItem, deleteItem, addCategory, renameCategory, deleteCategory } = useLogItems();
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [manageCategoriesVisible, setManageCategoriesVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [permanentDeleteModalVisible, setPermanentDeleteModalVisible] = useState(false);
+  const [itemToPermanentlyDelete, setItemToPermanentlyDelete] = useState<{ id: string; title: string } | null>(null);
+  const [restoreModalVisible, setRestoreModalVisible] = useState(false);
+  const [itemToRestore, setItemToRestore] = useState<{ id: string; title: string } | null>(null);
 
   const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
 
-  const filteredItems =
-    selectedCategory === 'All'
-      ? items
-      : items.filter((item) => item.category === selectedCategory);
+  // Filter items based on selected category
+  const filteredItems = (() => {
+    if (selectedCategory === 'Deleted') {
+      return items.filter((item) => item.isDeleted === true);
+    }
+    
+    const activeItems = items.filter((item) => !item.isDeleted);
+    
+    if (selectedCategory === 'All') {
+      return activeItems;
+    }
+    
+    return activeItems.filter((item) => item.category === selectedCategory);
+  })();
 
   const handleLogItem = (itemId: string) => {
     console.log('User tapped Log It button for item:', itemId);
@@ -49,15 +64,15 @@ export default function HomeScreen() {
   };
 
   const handleDeleteRequest = (itemId: string, itemTitle: string) => {
-    console.log('User requested delete for:', itemTitle);
+    console.log('User requested soft delete for:', itemTitle);
     setItemToDelete({ id: itemId, title: itemTitle });
     setDeleteModalVisible(true);
   };
 
   const handleConfirmDelete = async () => {
     if (itemToDelete) {
-      console.log('User confirmed delete via swipe:', itemToDelete.title);
-      await deleteItem(itemToDelete.id);
+      console.log('User confirmed soft delete via swipe:', itemToDelete.title);
+      await softDeleteItem(itemToDelete.id);
       setDeleteModalVisible(false);
       setItemToDelete(null);
     }
@@ -69,16 +84,75 @@ export default function HomeScreen() {
     setItemToDelete(null);
   };
 
+  const handleRestoreRequest = (itemId: string, itemTitle: string) => {
+    console.log('User requested restore for:', itemTitle);
+    setItemToRestore({ id: itemId, title: itemTitle });
+    setRestoreModalVisible(true);
+  };
+
+  const handleConfirmRestore = async () => {
+    if (itemToRestore) {
+      console.log('User confirmed restore:', itemToRestore.title);
+      await restoreItem(itemToRestore.id);
+      setRestoreModalVisible(false);
+      setItemToRestore(null);
+    }
+  };
+
+  const handleCancelRestore = () => {
+    console.log('User cancelled restore');
+    setRestoreModalVisible(false);
+    setItemToRestore(null);
+  };
+
+  const handlePermanentDeleteRequest = (itemId: string, itemTitle: string) => {
+    console.log('User requested permanent delete for:', itemTitle);
+    setItemToPermanentlyDelete({ id: itemId, title: itemTitle });
+    setPermanentDeleteModalVisible(true);
+  };
+
+  const handleConfirmPermanentDelete = async () => {
+    if (itemToPermanentlyDelete) {
+      console.log('User confirmed permanent delete:', itemToPermanentlyDelete.title);
+      await deleteItem(itemToPermanentlyDelete.id);
+      setPermanentDeleteModalVisible(false);
+      setItemToPermanentlyDelete(null);
+    }
+  };
+
+  const handleCancelPermanentDelete = () => {
+    console.log('User cancelled permanent delete');
+    setPermanentDeleteModalVisible(false);
+    setItemToPermanentlyDelete(null);
+  };
+
   const handleAddNewItemPress = () => {
     console.log('User tapped Add New Item row at bottom');
     setAddModalVisible(true);
   };
+
+  const handleSettingsPress = () => {
+    console.log('User tapped Settings button');
+    router.push('/settings');
+  };
+
+  const isDeletedView = selectedCategory === 'Deleted';
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Stack.Screen
         options={{
           title: 'Did I Log It?',
+          headerRight: () => (
+            <IconButton
+              ios_icon_name="gear"
+              android_material_icon_name="settings"
+              size={24}
+              color={theme.text}
+              onPress={handleSettingsPress}
+              accessibilityLabel="Settings"
+            />
+          ),
         }}
       />
 
@@ -115,6 +189,30 @@ export default function HomeScreen() {
                 ]}
               >
                 All
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor:
+                    selectedCategory === 'Deleted' ? theme.danger : theme.card,
+                  borderColor: theme.border,
+                },
+              ]}
+              onPress={() => {
+                console.log('User selected filter: Deleted');
+                setSelectedCategory('Deleted');
+              }}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  { color: selectedCategory === 'Deleted' ? '#FFFFFF' : theme.text },
+                ]}
+              >
+                Deleted
               </Text>
             </TouchableOpacity>
 
@@ -176,20 +274,70 @@ export default function HomeScreen() {
             {filteredItems.length === 0 ? (
               <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 <IconSymbol
-                  ios_icon_name="list.bullet"
-                  android_material_icon_name="list"
+                  ios_icon_name={isDeletedView ? 'trash' : 'list.bullet'}
+                  android_material_icon_name={isDeletedView ? 'delete' : 'list'}
                   size={48}
                   color={theme.textSecondary}
                 />
                 <Text style={[styles.emptyTitle, { color: theme.text }]}>
-                  {selectedCategory === 'All' ? 'No items yet' : `No ${selectedCategory} items`}
+                  {isDeletedView
+                    ? 'No deleted items'
+                    : selectedCategory === 'All'
+                    ? 'No items yet'
+                    : `No ${selectedCategory} items`}
                 </Text>
                 <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                  {selectedCategory === 'All'
+                  {isDeletedView
+                    ? 'Deleted items will appear here'
+                    : selectedCategory === 'All'
                     ? 'Tap "Add new item" below to get started'
                     : 'Try a different category or add a new item'}
                 </Text>
               </View>
+            ) : isDeletedView ? (
+              filteredItems.map((item) => (
+                <View
+                  key={item.id}
+                  style={[styles.deletedItemCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+                >
+                  <View style={styles.deletedItemInfo}>
+                    <Text style={[styles.deletedItemTitle, { color: theme.text }]}>
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.deletedItemMeta, { color: theme.textSecondary }]}>
+                      {item.logs.length > 0
+                        ? `Last logged: ${new Date(item.logs[0].timestamp).toLocaleDateString()}`
+                        : 'Never logged'}
+                    </Text>
+                  </View>
+                  <View style={styles.deletedItemActions}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: theme.success }]}
+                      onPress={() => handleRestoreRequest(item.id, item.title)}
+                    >
+                      <IconSymbol
+                        ios_icon_name="arrow.uturn.backward"
+                        android_material_icon_name="restore"
+                        size={20}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.actionButtonText}>Restore</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: theme.danger }]}
+                      onPress={() => handlePermanentDeleteRequest(item.id, item.title)}
+                    >
+                      <IconSymbol
+                        ios_icon_name="trash"
+                        android_material_icon_name="delete"
+                        size={20}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.actionButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
             ) : (
               filteredItems.map((item) => (
                 <SwipeableLogItemCard
@@ -202,24 +350,26 @@ export default function HomeScreen() {
               ))
             )}
 
-            <TouchableOpacity
-              style={[styles.addNewItemRow, { backgroundColor: theme.card, borderColor: theme.border }]}
-              onPress={handleAddNewItemPress}
-            >
-              <View style={styles.addNewItemContent}>
-                <View style={[styles.addIconContainer, { backgroundColor: theme.primaryLight }]}>
-                  <IconSymbol
-                    ios_icon_name="plus"
-                    android_material_icon_name="add"
-                    size={20}
-                    color={theme.primary}
-                  />
+            {!isDeletedView && (
+              <TouchableOpacity
+                style={[styles.addNewItemRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+                onPress={handleAddNewItemPress}
+              >
+                <View style={styles.addNewItemContent}>
+                  <View style={[styles.addIconContainer, { backgroundColor: theme.primaryLight }]}>
+                    <IconSymbol
+                      ios_icon_name="plus"
+                      android_material_icon_name="add"
+                      size={20}
+                      color={theme.primary}
+                    />
+                  </View>
+                  <Text style={[styles.addNewItemText, { color: theme.text }]}>
+                    Add new item
+                  </Text>
                 </View>
-                <Text style={[styles.addNewItemText, { color: theme.text }]}>
-                  Add new item
-                </Text>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </>
       )}
@@ -243,12 +393,34 @@ export default function HomeScreen() {
       <ConfirmModal
         visible={deleteModalVisible}
         title="Delete Item?"
-        message={itemToDelete ? `Are you sure you want to delete "${itemToDelete.title}" and all its history?` : ''}
+        message={itemToDelete ? `Move "${itemToDelete.title}" to deleted items? You can restore it later.` : ''}
         confirmText="Delete"
         cancelText="Cancel"
         destructive={true}
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
+      />
+
+      <ConfirmModal
+        visible={restoreModalVisible}
+        title="Restore Item?"
+        message={itemToRestore ? `Restore "${itemToRestore.title}" with all its history?` : ''}
+        confirmText="Restore"
+        cancelText="Cancel"
+        destructive={false}
+        onConfirm={handleConfirmRestore}
+        onCancel={handleCancelRestore}
+      />
+
+      <ConfirmModal
+        visible={permanentDeleteModalVisible}
+        title="Permanently Delete?"
+        message={itemToPermanentlyDelete ? `Permanently delete "${itemToPermanentlyDelete.title}" and all its history? This cannot be undone.` : ''}
+        confirmText="Delete Forever"
+        cancelText="Cancel"
+        destructive={true}
+        onConfirm={handleConfirmPermanentDelete}
+        onCancel={handleCancelPermanentDelete}
       />
     </View>
   );
@@ -321,6 +493,42 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  deletedItemCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  deletedItemInfo: {
+    marginBottom: 12,
+  },
+  deletedItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  deletedItemMeta: {
+    fontSize: 14,
+  },
+  deletedItemActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   addNewItemRow: {
     marginTop: 16,

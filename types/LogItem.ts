@@ -10,6 +10,7 @@ export interface LogItem {
   category: string; // Changed from Category type to string to support custom categories
   logs: LogEntry[];
   createdAt: string; // ISO 8601 format
+  isDeleted?: boolean; // Soft delete flag
 }
 
 export type Category = 'Home' | 'Car' | 'Family' | 'Personal' | 'Maintenance';
