@@ -4,21 +4,29 @@
     "slug": "did-i-log-it",
     "version": "1.0.0",
     "orientation": "portrait",
+
     "icon": "./assets/images/image.png",
+
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "splash": {
       "image": "./assets/images/image.png",
       "resizeMode": "contain",
       "backgroundColor": "#3B82F6"
     },
+
+    "scheme": "didilogit",
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.didilogit.app",
+      "icon": "./assets/images/image.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/image.png",
@@ -27,19 +35,22 @@
       "edgeToEdgeEnabled": true,
       "package": "com.didilogit.app"
     },
+
     "web": {
       "favicon": "./assets/images/final_quest_240x240.png",
       "bundler": "metro"
     },
+
     "plugins": [
       "expo-font",
       "expo-router",
       "expo-web-browser"
     ],
-    "scheme": "DidILogIt?",
+
     "experiments": {
       "typedRoutes": true
     },
+
     "extra": {
       "router": {},
       "backendUrl": "https://f9adjsayev8rzh8qshfj2y8r3ypdc58j.app.specular.dev"
