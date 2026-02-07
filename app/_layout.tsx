@@ -91,8 +91,12 @@ export default function RootLayout() {
               <Stack>
                 {/* Main app with tabs */}
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                {/* History screen */}
+                <Stack.Screen name="history/[id]" options={{ headerShown: true }} />
                 {/* Settings screen */}
                 <Stack.Screen name="settings" options={{ headerShown: true }} />
+                {/* 404 Not Found screen */}
+                <Stack.Screen name="+not-found" />
               </Stack>
               <SystemBars style={"auto"} />
             </GestureHandlerRootView>
