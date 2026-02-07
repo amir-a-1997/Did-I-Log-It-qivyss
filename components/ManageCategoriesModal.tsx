@@ -25,10 +25,13 @@ import Toast from 'react-native-toast-message';
 interface ManageCategoriesModalProps {
   visible: boolean;
   onClose: () => void;
-  categories: Category[]; // Custom categories from the hook
+  categories: Category[]; // Active custom categories from the hook
+  archivedCategories?: Category[]; // Archived custom categories from the hook
   onAddCategory: (name: string) => void;
   onRenameCategory: (categoryId: string, newName: string) => void;
-  onDeleteCategory: (categoryId: string) => Promise<boolean>;
+  onDeleteCategory?: (categoryId: string) => Promise<boolean>; // Legacy - calls archive
+  onArchiveCategory?: (categoryId: string) => Promise<boolean>;
+  onRestoreCategory?: (categoryId: string) => Promise<boolean>;
   items: LogItem[];
 }
 
@@ -36,9 +39,12 @@ export function ManageCategoriesModal({
   visible,
   onClose,
   categories,
+  archivedCategories = [],
   onAddCategory,
   onRenameCategory,
   onDeleteCategory,
+  onArchiveCategory,
+  onRestoreCategory,
   items,
 }: ManageCategoriesModalProps) {
   const { effectiveColorScheme, accentColor } = useTheme();
@@ -48,9 +54,9 @@ export function ManageCategoriesModal({
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');
-  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [archiveConfirmVisible, setArchiveConfirmVisible] = useState(false);
+  const [categoryToArchive, setCategoryToArchive] = useState<Category | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
   
   // isMounted guard to prevent state updates after unmount
   const isMounted = useRef(true);
@@ -58,13 +64,13 @@ export function ManageCategoriesModal({
   // Animation for sliding down from top
   const slideAnim = useRef(new Animated.Value(-1000)).current;
 
-  // Count items in the category to be deleted (excluding already deleted items)
+  // Count items in the category to be archived (excluding already deleted items)
   const itemsInCategoryCount = useMemo(() => {
-    if (!categoryToDelete) {
+    if (!categoryToArchive) {
       return 0;
     }
-    return items.filter((item) => item.categoryId === categoryToDelete.categoryId && !item.isDeleted).length;
-  }, [items, categoryToDelete]);
+    return items.filter((item) => item.categoryId === categoryToArchive.categoryId && !item.isDeleted).length;
+  }, [items, categoryToArchive]);
 
   useEffect(() => {
     // Set isMounted to true when component mounts
@@ -137,91 +143,138 @@ export function ManageCategoriesModal({
     Keyboard.dismiss();
   };
 
-  const handleDeleteRequest = (category: Category) => {
-    console.log('User tapped trash icon for category:', category.name);
+  const handleArchiveRequest = (category: Category) => {
+    console.log('User tapped archive icon for category:', category.name);
     
     if (category.isDefault) {
-      console.warn('Attempted to delete a default category:', category.name);
+      console.warn('Attempted to archive a default category:', category.name);
       Toast.show({
         type: 'error',
-        text1: "Default categories can't be deleted",
+        text1: "Default categories can't be archived",
       });
       return;
     }
     
-    console.log('Showing confirmation dialog for category deletion');
-    setCategoryToDelete(category);
-    setDeleteConfirmVisible(true);
+    console.log('Showing confirmation dialog for category archive');
+    setCategoryToArchive(category);
+    setArchiveConfirmVisible(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!categoryToDelete) {
-      console.warn('No category to delete');
-      setDeleteConfirmVisible(false);
+  const handleConfirmArchive = async () => {
+    if (!categoryToArchive) {
+      console.warn('No category to archive');
+      setArchiveConfirmVisible(false);
       return;
     }
     
-    console.log('User confirmed deletion of category:', categoryToDelete.name);
+    console.log('User confirmed archive of category:', categoryToArchive.name);
     
     // Close the confirmation modal first
-    setDeleteConfirmVisible(false);
+    setArchiveConfirmVisible(false);
     
-    // Set deleting state to disable UI during deletion
+    // Set archiving state to disable UI during archive
     if (isMounted.current) {
-      setIsDeleting(true);
+      setIsArchiving(true);
     }
     
     try {
-      // Call the delete function
-      const success = await onDeleteCategory(categoryToDelete.categoryId);
+      // Call the archive function (prefer onArchiveCategory, fallback to onDeleteCategory)
+      const archiveFunc = onArchiveCategory || onDeleteCategory;
+      if (!archiveFunc) {
+        console.error('No archive function provided');
+        Toast.show({
+          type: 'error',
+          text1: 'Archive function not available',
+        });
+        return;
+      }
+      
+      const success = await archiveFunc(categoryToArchive.categoryId);
       
       // Only update state if component is still mounted
       if (isMounted.current) {
         if (success) {
-          console.log('Category deleted successfully');
-          Toast.show({
-            type: 'success',
-            text1: 'Category deleted',
-          });
+          console.log('Category archived successfully');
+          // Toast is shown by the hook
         } else {
-          console.error('Category deletion failed');
-          Toast.show({
-            type: 'error',
-            text1: 'Failed to delete category',
-          });
+          console.error('Category archive failed');
+          // Toast is shown by the hook
         }
       } else {
-        console.log('Component unmounted during deletion - skipping state update');
+        console.log('Component unmounted during archive - skipping state update');
       }
     } catch (error) {
-      console.error('Error during category deletion:', error);
+      console.error('Error during category archive:', error);
       if (isMounted.current) {
         Toast.show({
           type: 'error',
-          text1: 'Failed to delete category',
+          text1: 'Failed to archive category',
         });
       }
     } finally {
       // Only update state if component is still mounted
       if (isMounted.current) {
-        setIsDeleting(false);
-        setCategoryToDelete(null);
+        setIsArchiving(false);
+        setCategoryToArchive(null);
       }
     }
   };
 
-  const handleCancelDelete = () => {
-    console.log('User cancelled category deletion');
-    setCategoryToDelete(null);
-    setDeleteConfirmVisible(false);
+  const handleCancelArchive = () => {
+    console.log('User cancelled category archive');
+    setCategoryToArchive(null);
+    setArchiveConfirmVisible(false);
+  };
+
+  const handleRestore = async (category: Category) => {
+    console.log('User tapped restore for category:', category.name);
+    
+    if (!onRestoreCategory) {
+      console.error('No restore function provided');
+      Toast.show({
+        type: 'error',
+        text1: 'Restore function not available',
+      });
+      return;
+    }
+    
+    if (isMounted.current) {
+      setIsArchiving(true);
+    }
+    
+    try {
+      const success = await onRestoreCategory(category.categoryId);
+      
+      if (isMounted.current) {
+        if (success) {
+          console.log('Category restored successfully');
+          // Toast is shown by the hook
+        } else {
+          console.error('Category restore failed');
+          // Toast is shown by the hook
+        }
+      }
+    } catch (error) {
+      console.error('Error during category restore:', error);
+      if (isMounted.current) {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to restore category',
+        });
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsArchiving(false);
+      }
+    }
   };
 
   const handleClose = () => {
     console.log('User tapped X to close Manage Categories sheet');
     
-    // Don't allow close while deletion is in progress
-    if (isDeleting) {
-      console.log('Deletion in progress - preventing close');
+    // Don't allow close while archiving is in progress
+    if (isArchiving) {
+      console.log('Archive in progress - preventing close');
       return;
     }
     
@@ -229,9 +282,9 @@ export function ManageCategoriesModal({
     onClose();
   };
 
-  const deleteConfirmTitle = 'Delete category?';
-  const deleteConfirmMessage = categoryToDelete
-    ? `This will remove the category "${categoryToDelete.name}". Items in this category will be moved to Uncategorised.`
+  const archiveConfirmTitle = 'Archive category?';
+  const archiveConfirmMessage = categoryToArchive
+    ? `This will archive the category "${categoryToArchive.name}". Items in this category will be moved to Uncategorised. You can restore it later from the Archived section.`
     : '';
 
   return (
@@ -248,7 +301,7 @@ export function ManageCategoriesModal({
             style={styles.backdrop}
             activeOpacity={1}
             onPress={handleClose}
-            disabled={isDeleting}
+            disabled={isArchiving}
           />
           
           {/* Top Sheet - slides down from top */}
@@ -275,10 +328,10 @@ export function ManageCategoriesModal({
                     ios_icon_name="xmark"
                     android_material_icon_name="close"
                     size={24}
-                    color={isDeleting ? theme.textSecondary : theme.text}
+                    color={isArchiving ? theme.textSecondary : theme.text}
                     onPress={handleClose}
                     accessibilityLabel="Close"
-                    disabled={isDeleting}
+                    disabled={isArchiving}
                   />
                 </View>
 
@@ -303,19 +356,19 @@ export function ManageCategoriesModal({
                       onChangeText={setNewCategoryName}
                       returnKeyType="done"
                       onSubmitEditing={handleAddCategory}
-                      editable={!isDeleting}
+                      editable={!isArchiving}
                     />
                     <TouchableOpacity
                       style={[
                         styles.addButton,
                         {
-                          backgroundColor: newCategoryName.trim() && !isDeleting
+                          backgroundColor: newCategoryName.trim() && !isArchiving
                             ? theme.primary
                             : theme.border,
                         },
                       ]}
                       onPress={handleAddCategory}
-                      disabled={!newCategoryName.trim() || isDeleting}
+                      disabled={!newCategoryName.trim() || isArchiving}
                     >
                       <IconSymbol
                         ios_icon_name="plus"
@@ -332,7 +385,7 @@ export function ManageCategoriesModal({
                   style={styles.scrollView}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={true}
-                  scrollEnabled={!isDeleting}
+                  scrollEnabled={!isArchiving}
                 >
                   {/* Default Categories */}
                   <View style={styles.section}>
@@ -357,7 +410,7 @@ export function ManageCategoriesModal({
                     ))}
                   </View>
 
-                  {/* Custom Categories */}
+                  {/* Custom Categories (Active) */}
                   <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>
                       Custom Categories
@@ -392,10 +445,10 @@ export function ManageCategoriesModal({
                                   autoFocus
                                   returnKeyType="done"
                                   onSubmitEditing={handleSaveEdit}
-                                  editable={!isDeleting}
+                                  editable={!isArchiving}
                                 />
                                 <View style={styles.editActions}>
-                                  <TouchableOpacity onPress={handleSaveEdit} disabled={isDeleting}>
+                                  <TouchableOpacity onPress={handleSaveEdit} disabled={isArchiving}>
                                     <IconSymbol
                                       ios_icon_name="checkmark"
                                       android_material_icon_name="check"
@@ -403,7 +456,7 @@ export function ManageCategoriesModal({
                                       color={theme.success}
                                     />
                                   </TouchableOpacity>
-                                  <TouchableOpacity onPress={handleCancelEdit} disabled={isDeleting}>
+                                  <TouchableOpacity onPress={handleCancelEdit} disabled={isArchiving}>
                                     <IconSymbol
                                       ios_icon_name="xmark"
                                       android_material_icon_name="close"
@@ -421,25 +474,25 @@ export function ManageCategoriesModal({
                                 <View style={styles.actions}>
                                   <TouchableOpacity 
                                     onPress={() => handleStartEdit(category)}
-                                    disabled={isDeleting}
+                                    disabled={isArchiving}
                                   >
                                     <IconSymbol
                                       ios_icon_name="pencil"
                                       android_material_icon_name="edit"
                                       size={20}
-                                      color={isDeleting ? theme.textSecondary : theme.primary}
+                                      color={isArchiving ? theme.textSecondary : theme.primary}
                                     />
                                   </TouchableOpacity>
                                   {!category.isDefault && (
                                     <TouchableOpacity 
-                                      onPress={() => handleDeleteRequest(category)}
-                                      disabled={isDeleting}
+                                      onPress={() => handleArchiveRequest(category)}
+                                      disabled={isArchiving}
                                     >
                                       <IconSymbol
-                                        ios_icon_name="trash"
-                                        android_material_icon_name="delete"
+                                        ios_icon_name="archivebox"
+                                        android_material_icon_name="archive"
                                         size={20}
-                                        color={isDeleting ? theme.textSecondary : theme.danger}
+                                        color={isArchiving ? theme.textSecondary : theme.warning}
                                       />
                                     </TouchableOpacity>
                                   )}
@@ -452,6 +505,44 @@ export function ManageCategoriesModal({
                     )}
                   </View>
 
+                  {/* Archived Categories */}
+                  {archivedCategories.length > 0 && (
+                    <View style={styles.section}>
+                      <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+                        Archived
+                      </Text>
+                      {archivedCategories.map((category) => (
+                        <View
+                          key={category.categoryId}
+                          style={[
+                            styles.categoryRow,
+                            styles.archivedRow,
+                            { backgroundColor: theme.card, borderColor: theme.border, opacity: 0.6 },
+                          ]}
+                        >
+                          <Text style={[styles.categoryName, { color: theme.textSecondary }]}>
+                            {category.name}
+                          </Text>
+                          <TouchableOpacity 
+                            onPress={() => handleRestore(category)}
+                            disabled={isArchiving}
+                            style={styles.restoreButton}
+                          >
+                            <IconSymbol
+                              ios_icon_name="arrow.uturn.backward"
+                              android_material_icon_name="restore"
+                              size={18}
+                              color={isArchiving ? theme.textSecondary : theme.success}
+                            />
+                            <Text style={[styles.restoreText, { color: isArchiving ? theme.textSecondary : theme.success }]}>
+                              Restore
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
                   {/* Bottom padding for scroll */}
                   <View style={{ height: 40 }} />
                 </ScrollView>
@@ -461,16 +552,16 @@ export function ManageCategoriesModal({
         </View>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* Archive Confirmation Modal */}
       <ConfirmModal
-        visible={deleteConfirmVisible}
-        title={deleteConfirmTitle}
-        message={deleteConfirmMessage}
-        confirmText="Delete"
+        visible={archiveConfirmVisible}
+        title={archiveConfirmTitle}
+        message={archiveConfirmMessage}
+        confirmText="Archive"
         cancelText="Cancel"
-        onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
-        destructive
+        onConfirm={handleConfirmArchive}
+        onCancel={handleCancelArchive}
+        destructive={false}
       />
     </>
   );
@@ -562,6 +653,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 8,
   },
+  archivedRow: {
+    borderStyle: 'dashed',
+  },
   categoryName: {
     fontSize: 16,
     flex: 1,
@@ -589,5 +683,16 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     fontStyle: 'italic',
+  },
+  restoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  restoreText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

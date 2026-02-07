@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,21 @@ export default function HomeScreen() {
   const { effectiveColorScheme, accentColor } = useTheme();
   const theme = getColors(effectiveColorScheme, accentColor);
   const router = useRouter();
-  const { items, loading, categories, addItem, logItem, softDeleteItem, restoreItem, deleteItem, addCategory, renameCategory, deleteCategory } = useLogItems();
+  const { 
+    items, 
+    loading, 
+    categories, 
+    archivedCategories,
+    addItem, 
+    logItem, 
+    softDeleteItem, 
+    restoreItem, 
+    deleteItem, 
+    addCategory, 
+    renameCategory, 
+    archiveCategory,
+    restoreCategory,
+  } = useLogItems();
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [manageCategoriesVisible, setManageCategoriesVisible] = useState(false);
@@ -38,14 +52,26 @@ export default function HomeScreen() {
 
   // Combine all categories with "All" and "Deleted" options
   // SINGLE SOURCE OF TRUTH: Categories come from the hook which reads from storage
+  // ONLY show active (non-archived) categories
   const allCategoriesForFilter = useMemo(() => {
-    const allCategories = [...DEFAULT_CATEGORIES, ...categories];
+    const allCategories = [...DEFAULT_CATEGORIES, ...categories]; // categories already filtered to isArchived=false
     return [
-      { categoryId: 'All', name: 'All', isDefault: false, sortOrder: -2 },
+      { categoryId: 'All', name: 'All', isDefault: false, sortOrder: -2, isArchived: false },
       ...allCategories,
-      { categoryId: 'Deleted', name: 'Deleted', isDefault: false, sortOrder: 9999 },
+      { categoryId: 'Deleted', name: 'Deleted', isDefault: false, sortOrder: 9999, isArchived: false },
     ];
   }, [categories]);
+
+  // If the selected category is archived, reset to "All"
+  useEffect(() => {
+    if (selectedCategoryId !== 'All' && selectedCategoryId !== 'Deleted') {
+      const isArchived = archivedCategories.some(cat => cat.categoryId === selectedCategoryId);
+      if (isArchived) {
+        console.log('Selected category is archived, resetting to All');
+        setSelectedCategoryId('All');
+      }
+    }
+  }, [archivedCategories, selectedCategoryId]);
 
   // Filter items based on selected category
   const filteredItems = useMemo(() => {
@@ -362,9 +388,11 @@ export default function HomeScreen() {
         visible={manageCategoriesVisible}
         onClose={() => setManageCategoriesVisible(false)}
         categories={categories}
+        archivedCategories={archivedCategories}
         onAddCategory={addCategory}
         onRenameCategory={renameCategory}
-        onDeleteCategory={deleteCategory}
+        onArchiveCategory={archiveCategory}
+        onRestoreCategory={restoreCategory}
         items={items}
       />
 

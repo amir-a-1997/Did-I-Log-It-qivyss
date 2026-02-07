@@ -9,7 +9,8 @@ const CATEGORIES_KEY = 'did_i_log_it_categories';
 
 export function useLogItems() {
   const [items, setItems] = useState<LogItem[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]); // Active categories only
+  const [archivedCategories, setArchivedCategories] = useState<Category[]>([]); // Archived categories
   const [loading, setLoading] = useState(true);
 
   // Load items and categories from storage
@@ -55,18 +56,38 @@ export function useLogItems() {
             name,
             isDefault: false,
             sortOrder: DEFAULT_CATEGORIES.length + index,
+            isArchived: false,
           }));
-          setCategories(migratedCategories);
+          setCategories(migratedCategories.filter((c: Category) => !c.isArchived));
+          setArchivedCategories(migratedCategories.filter((c: Category) => c.isArchived));
           await storage.setItem(CATEGORIES_KEY, JSON.stringify(migratedCategories));
           console.log('Migrated custom categories to new format:', migratedCategories);
         } else {
-          setCategories(parsed);
-          console.log('Loaded custom categories:', parsed);
+          // Migration: Add isArchived field to existing categories if missing
+          const migratedCategories = parsed.map((cat: any) => ({
+            ...cat,
+            isArchived: cat.isArchived ?? false,
+          }));
+          
+          // Separate active and archived
+          const active = migratedCategories.filter((c: Category) => !c.isArchived);
+          const archived = migratedCategories.filter((c: Category) => c.isArchived);
+          
+          setCategories(active);
+          setArchivedCategories(archived);
+          console.log('Loaded custom categories - active:', active.length, 'archived:', archived.length);
+          
+          // Save migrated data if isArchived was added
+          if (parsed.some((cat: any) => cat.isArchived === undefined)) {
+            await storage.setItem(CATEGORIES_KEY, JSON.stringify(migratedCategories));
+            console.log('Migrated categories with isArchived field');
+          }
         }
       } else {
-        // Initialize with empty array if no categories exist
+        // Initialize with empty arrays if no categories exist
         setCategories([]);
-        console.log('No custom categories found, initialized with empty array');
+        setArchivedCategories([]);
+        console.log('No custom categories found, initialized with empty arrays');
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -85,11 +106,18 @@ export function useLogItems() {
     }
   };
 
-  const saveCategories = async (newCategories: Category[]) => {
+  const saveCategories = async (allCategories: Category[]) => {
     try {
-      console.log('Saving custom categories to storage:', newCategories);
-      await storage.setItem(CATEGORIES_KEY, JSON.stringify(newCategories));
-      setCategories(newCategories);
+      console.log('Saving all categories to storage (active + archived):', allCategories.length);
+      await storage.setItem(CATEGORIES_KEY, JSON.stringify(allCategories));
+      
+      // Separate active and archived for state
+      const active = allCategories.filter(c => !c.isArchived);
+      const archived = allCategories.filter(c => c.isArchived);
+      
+      setCategories(active);
+      setArchivedCategories(archived);
+      console.log('Categories updated - active:', active.length, 'archived:', archived.length);
     } catch (error) {
       console.error('Error saving categories:', error);
     }
@@ -231,7 +259,7 @@ export function useLogItems() {
     const storedCategories = await storage.getItem(CATEGORIES_KEY);
     const currentCategories = storedCategories ? JSON.parse(storedCategories) : [];
     
-    // Check if category name already exists (including default categories)
+    // Check if category name already exists (including default categories and archived)
     const allCategories = [...DEFAULT_CATEGORIES, ...currentCategories];
     const exists = allCategories.some(cat => cat.name.toLowerCase() === categoryName.toLowerCase());
     
@@ -241,6 +269,7 @@ export function useLogItems() {
         name: categoryName,
         isDefault: false,
         sortOrder: DEFAULT_CATEGORIES.length + currentCategories.length,
+        isArchived: false,
       };
       const updatedCategories = [...currentCategories, newCategory];
       await saveCategories(updatedCategories);
@@ -265,10 +294,10 @@ export function useLogItems() {
     console.log('Category renamed successfully');
   };
 
-  const deleteCategory = useCallback(async (categoryId: string): Promise<boolean> => {
+  const archiveCategory = useCallback(async (categoryId: string): Promise<boolean> => {
     try {
-      console.log('=== STARTING CATEGORY DELETION (SOFT DELETE ITEMS) ===');
-      console.log('Deleting category and moving items to Uncategorised:', categoryId);
+      console.log('=== STARTING CATEGORY ARCHIVE (SOFT DELETE) ===');
+      console.log('Archiving category and moving items to Uncategorised:', categoryId);
       
       // CRITICAL: Read from storage first to ensure we have the latest data (single source of truth)
       const storedItems = await storage.getItem(STORAGE_KEY);
@@ -277,23 +306,23 @@ export function useLogItems() {
       const storedCategories = await storage.getItem(CATEGORIES_KEY);
       const currentCategories = storedCategories ? JSON.parse(storedCategories) : [];
       
-      console.log('Current items from storage before category deletion:', currentItems.length);
-      console.log('Current categories from storage before deletion:', currentCategories.length);
+      console.log('Current items from storage before category archive:', currentItems.length);
+      console.log('Current categories from storage before archive:', currentCategories.length);
       
-      // Find the category to delete
-      const categoryToDelete = currentCategories.find((cat: Category) => cat.categoryId === categoryId);
+      // Find the category to archive
+      const categoryToArchive = currentCategories.find((cat: Category) => cat.categoryId === categoryId);
       
-      if (!categoryToDelete) {
-        console.warn('Category not found for deletion:', categoryId);
+      if (!categoryToArchive) {
+        console.warn('Category not found for archive:', categoryId);
         Toast.show({ type: 'error', text1: 'Category not found.' });
         return false;
       }
       
-      console.log('Found category to delete:', categoryToDelete.name);
+      console.log('Found category to archive:', categoryToArchive.name);
       
-      if (categoryToDelete.isDefault) {
-        console.warn('Attempted to delete a default category:', categoryId);
-        Toast.show({ type: 'error', text1: "Default categories can't be deleted." });
+      if (categoryToArchive.isDefault) {
+        console.warn('Attempted to archive a default category:', categoryId);
+        Toast.show({ type: 'error', text1: "Default categories can't be archived." });
         return false;
       }
       
@@ -304,16 +333,18 @@ export function useLogItems() {
         console.log('  - Moving item:', item.title);
       });
       
-      // Set categoryId to null for items in the deleted category (move to Uncategorised)
+      // Set categoryId to null for items in the archived category (move to Uncategorised)
       // DO NOT delete items or their logs
       const updatedItems = currentItems.map((item: LogItem) =>
         item.categoryId === categoryId ? { ...item, categoryId: null } : item
       );
       console.log('Items updated - total count:', updatedItems.length);
       
-      // Remove the category from the custom categories list
-      const updatedCategories = currentCategories.filter((cat: Category) => cat.categoryId !== categoryId);
-      console.log('Remaining categories after deletion:', updatedCategories.length);
+      // Set isArchived = true for the category
+      const updatedCategories = currentCategories.map((cat: Category) =>
+        cat.categoryId === categoryId ? { ...cat, isArchived: true } : cat
+      );
+      console.log('Category archived in list');
       
       // Save both to persistent storage
       await storage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
@@ -324,33 +355,96 @@ export function useLogItems() {
       
       // Update in-memory state
       setItems(updatedItems);
-      setCategories(updatedCategories);
+      await saveCategories(updatedCategories); // This will separate active/archived
       console.log('✓ In-memory state updated');
       
-      // Verify the deletion by reading back from storage
+      // Verify the archive by reading back from storage
       const verifyItems = await storage.getItem(STORAGE_KEY);
       const verifiedItems = verifyItems ? JSON.parse(verifyItems) : [];
-      console.log('Verified items after category deletion - total count:', verifiedItems.length);
+      console.log('Verified items after category archive - total count:', verifiedItems.length);
       const uncategorisedCount = verifiedItems.filter((item: LogItem) => item.categoryId === null).length;
       console.log('Verified uncategorised items count:', uncategorisedCount);
       
       const verifyCategories = await storage.getItem(CATEGORIES_KEY);
       const verifiedCategories = verifyCategories ? JSON.parse(verifyCategories) : [];
-      console.log('Verified categories after deletion - total count:', verifiedCategories.length);
+      const archivedCount = verifiedCategories.filter((cat: Category) => cat.isArchived).length;
+      console.log('Verified categories after archive - total count:', verifiedCategories.length, 'archived:', archivedCount);
       
-      console.log('=== CATEGORY DELETION COMPLETE (ITEMS MOVED TO UNCATEGORISED) ===');
+      Toast.show({ type: 'success', text1: 'Category archived.' });
+      console.log('=== CATEGORY ARCHIVE COMPLETE (ITEMS MOVED TO UNCATEGORISED) ===');
       return true;
     } catch (error) {
-      console.error('Failed to delete category:', error);
-      Toast.show({ type: 'error', text1: 'Failed to delete category.' });
+      console.error('Failed to archive category:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Toast.show({ type: 'error', text1: `Archive failed: ${errorMessage}` });
       return false;
     }
   }, []);
 
+  const restoreCategory = useCallback(async (categoryId: string): Promise<boolean> => {
+    try {
+      console.log('=== STARTING CATEGORY RESTORE ===');
+      console.log('Restoring category:', categoryId);
+      
+      // Read from storage to get the latest categories
+      const storedCategories = await storage.getItem(CATEGORIES_KEY);
+      const currentCategories = storedCategories ? JSON.parse(storedCategories) : [];
+      
+      console.log('Current categories from storage before restore:', currentCategories.length);
+      
+      // Find the category to restore
+      const categoryToRestore = currentCategories.find((cat: Category) => cat.categoryId === categoryId);
+      
+      if (!categoryToRestore) {
+        console.warn('Category not found for restore:', categoryId);
+        Toast.show({ type: 'error', text1: 'Category not found.' });
+        return false;
+      }
+      
+      console.log('Found category to restore:', categoryToRestore.name);
+      
+      // Set isArchived = false for the category
+      const updatedCategories = currentCategories.map((cat: Category) =>
+        cat.categoryId === categoryId ? { ...cat, isArchived: false } : cat
+      );
+      console.log('Category restored in list');
+      
+      // Save to persistent storage
+      await storage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories));
+      console.log('✓ Categories saved to storage');
+      
+      // Update in-memory state
+      await saveCategories(updatedCategories); // This will separate active/archived
+      console.log('✓ In-memory state updated');
+      
+      // Verify the restore by reading back from storage
+      const verifyCategories = await storage.getItem(CATEGORIES_KEY);
+      const verifiedCategories = verifyCategories ? JSON.parse(verifyCategories) : [];
+      const archivedCount = verifiedCategories.filter((cat: Category) => cat.isArchived).length;
+      console.log('Verified categories after restore - total count:', verifiedCategories.length, 'archived:', archivedCount);
+      
+      Toast.show({ type: 'success', text1: 'Category restored.' });
+      console.log('=== CATEGORY RESTORE COMPLETE ===');
+      return true;
+    } catch (error) {
+      console.error('Failed to restore category:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Toast.show({ type: 'error', text1: `Restore failed: ${errorMessage}` });
+      return false;
+    }
+  }, []);
+
+  // Legacy deleteCategory function - now calls archiveCategory
+  const deleteCategory = useCallback(async (categoryId: string): Promise<boolean> => {
+    console.log('deleteCategory called - redirecting to archiveCategory');
+    return await archiveCategory(categoryId);
+  }, [archiveCategory]);
+
   return {
     items,
     loading,
-    categories, // Return all categories (custom only, default categories are in DEFAULT_CATEGORIES constant)
+    categories, // Active custom categories only (isArchived = false)
+    archivedCategories, // Archived custom categories (isArchived = true)
     addItem,
     logItem,
     softDeleteItem,
@@ -360,6 +454,8 @@ export function useLogItems() {
     clearItemHistory,
     addCategory,
     renameCategory,
-    deleteCategory,
+    deleteCategory, // Legacy - calls archiveCategory
+    archiveCategory,
+    restoreCategory,
   };
 }

@@ -9,12 +9,13 @@ export interface Category {
   name: string;
   isDefault: boolean;
   sortOrder?: number; // Optional sort order for display
+  isArchived?: boolean; // Soft delete flag for categories (default false)
 }
 
 export interface LogItem {
   id: string;
   title: string;
-  categoryId: string; // Reference category by ID, not name
+  categoryId: string | null; // Reference category by ID, not name (null = Uncategorised)
   logs: LogEntry[];
   createdAt: string; // ISO 8601 format
   isDeleted?: boolean; // Soft delete flag
@@ -27,11 +28,11 @@ export const DEFAULT_CATEGORY_NAMES: DefaultCategoryName[] = ['Home', 'Car', 'Fa
 
 // Default categories with IDs and sort order
 export const DEFAULT_CATEGORIES: Category[] = [
-  { categoryId: 'default-home', name: 'Home', isDefault: true, sortOrder: 0 },
-  { categoryId: 'default-car', name: 'Car', isDefault: true, sortOrder: 1 },
-  { categoryId: 'default-family', name: 'Family', isDefault: true, sortOrder: 2 },
-  { categoryId: 'default-personal', name: 'Personal', isDefault: true, sortOrder: 3 },
-  { categoryId: 'default-maintenance', name: 'Maintenance', isDefault: true, sortOrder: 4 },
+  { categoryId: 'default-home', name: 'Home', isDefault: true, sortOrder: 0, isArchived: false },
+  { categoryId: 'default-car', name: 'Car', isDefault: true, sortOrder: 1, isArchived: false },
+  { categoryId: 'default-family', name: 'Family', isDefault: true, sortOrder: 2, isArchived: false },
+  { categoryId: 'default-personal', name: 'Personal', isDefault: true, sortOrder: 3, isArchived: false },
+  { categoryId: 'default-maintenance', name: 'Maintenance', isDefault: true, sortOrder: 4, isArchived: false },
 ];
 
 export const CATEGORY_COLORS: Record<DefaultCategoryName, { light: string; dark: string }> = {
