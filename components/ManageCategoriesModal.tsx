@@ -19,8 +19,9 @@ import { IconButton } from './IconButton';
 import { DEFAULT_CATEGORIES, LogItem, Category } from '@/types/LogItem';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ConfirmModal } from './ConfirmModal';
 import Toast from 'react-native-toast-message';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import * as Haptics from 'expo-haptics';
 
 interface ManageCategoriesModalProps {
   visible: boolean;
@@ -54,8 +55,6 @@ export function ManageCategoriesModal({
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');
-  const [archiveConfirmVisible, setArchiveConfirmVisible] = useState(false);
-  const [categoryToArchive, setCategoryToArchive] = useState<Category | null>(null);
   const [isArchiving, setIsArchiving] = useState(false);
   
   // isMounted guard to prevent state updates after unmount
@@ -63,14 +62,11 @@ export function ManageCategoriesModal({
   
   // Animation for sliding down from top
   const slideAnim = useRef(new Animated.Value(-1000)).current;
+  
+  // Refs to close swipeable rows
+  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
-  // Count items in the category to be archived (excluding already deleted items)
-  const itemsInCategoryCount = useMemo(() => {
-    if (!categoryToArchive) {
-      return 0;
-    }
-    return items.filter((item) => item.categoryId === categoryToArchive.categoryId && !item.isDeleted).length;
-  }, [items, categoryToArchive]);
+
 
   useEffect(() => {
     // Set isMounted to true when component mounts
@@ -143,8 +139,8 @@ export function ManageCategoriesModal({
     Keyboard.dismiss();
   };
 
-  const handleArchiveRequest = (category: Category) => {
-    console.log('User tapped archive icon for category:', category.name);
+  const handleArchive = async (category: Category) => {
+    console.log('User swiped to archive category:', category.name);
     
     if (category.isDefault) {
       console.warn('Attempted to archive a default category:', category.name);
@@ -155,22 +151,11 @@ export function ManageCategoriesModal({
       return;
     }
     
-    console.log('Showing confirmation dialog for category archive');
-    setCategoryToArchive(category);
-    setArchiveConfirmVisible(true);
-  };
-
-  const handleConfirmArchive = async () => {
-    if (!categoryToArchive) {
-      console.warn('No category to archive');
-      setArchiveConfirmVisible(false);
-      return;
+    // Close the swipeable row
+    const swipeableRef = swipeableRefs.current.get(category.categoryId);
+    if (swipeableRef) {
+      swipeableRef.close();
     }
-    
-    console.log('User confirmed archive of category:', categoryToArchive.name);
-    
-    // Close the confirmation modal first
-    setArchiveConfirmVisible(false);
     
     // Set archiving state to disable UI during archive
     if (isMounted.current) {
@@ -189,7 +174,7 @@ export function ManageCategoriesModal({
         return;
       }
       
-      const success = await archiveFunc(categoryToArchive.categoryId);
+      const success = await archiveFunc(category.categoryId);
       
       // Only update state if component is still mounted
       if (isMounted.current) {
@@ -215,19 +200,12 @@ export function ManageCategoriesModal({
       // Only update state if component is still mounted
       if (isMounted.current) {
         setIsArchiving(false);
-        setCategoryToArchive(null);
       }
     }
   };
 
-  const handleCancelArchive = () => {
-    console.log('User cancelled category archive');
-    setCategoryToArchive(null);
-    setArchiveConfirmVisible(false);
-  };
-
   const handleRestore = async (category: Category) => {
-    console.log('User tapped restore for category:', category.name);
+    console.log('User swiped to restore category:', category.name);
     
     if (!onRestoreCategory) {
       console.error('No restore function provided');
@@ -236,6 +214,12 @@ export function ManageCategoriesModal({
         text1: 'Restore function not available',
       });
       return;
+    }
+    
+    // Close the swipeable row
+    const swipeableRef = swipeableRefs.current.get(category.categoryId);
+    if (swipeableRef) {
+      swipeableRef.close();
     }
     
     if (isMounted.current) {
@@ -282,10 +266,75 @@ export function ManageCategoriesModal({
     onClose();
   };
 
-  const archiveConfirmTitle = 'Archive category?';
-  const archiveConfirmMessage = categoryToArchive
-    ? `This will archive the category "${categoryToArchive.name}". Items in this category will be moved to Uncategorised. You can restore it later from the Archived section.`
-    : '';
+  // Render swipe actions for archive
+  const renderArchiveAction = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>,
+    category: Category
+  ) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View style={[styles.swipeAction, { transform: [{ scale }] }]}>
+        <TouchableOpacity
+          style={[styles.swipeButton, { backgroundColor: theme.warning }]}
+          onPress={() => {
+            console.log('User tapped swipe archive button for:', category.name);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            handleArchive(category);
+          }}
+          disabled={isArchiving}
+        >
+          <IconSymbol
+            ios_icon_name="archivebox"
+            android_material_icon_name="archive"
+            size={24}
+            color="#FFFFFF"
+          />
+          <Text style={styles.swipeText}>Archive</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  // Render swipe actions for restore
+  const renderRestoreAction = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>,
+    category: Category
+  ) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View style={[styles.swipeAction, { transform: [{ scale }] }]}>
+        <TouchableOpacity
+          style={[styles.swipeButton, { backgroundColor: theme.success }]}
+          onPress={() => {
+            console.log('User tapped swipe restore button for:', category.name);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            handleRestore(category);
+          }}
+          disabled={isArchiving}
+        >
+          <IconSymbol
+            ios_icon_name="arrow.uturn.backward"
+            android_material_icon_name="restore"
+            size={24}
+            color="#FFFFFF"
+          />
+          <Text style={styles.swipeText}>Restore</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   return (
     <>
@@ -421,16 +470,19 @@ export function ManageCategoriesModal({
                       </Text>
                     ) : (
                       <>
-                        {categories.map((category) => (
-                          <View
-                            key={category.categoryId}
-                            style={[
-                              styles.categoryRow,
-                              { backgroundColor: theme.card, borderColor: theme.border },
-                            ]}
-                          >
-                            {editingCategory === category.categoryId ? (
-                              <>
+                        {categories.map((category) => {
+                          const isEditing = editingCategory === category.categoryId;
+                          
+                          // If editing, don't wrap in Swipeable
+                          if (isEditing) {
+                            return (
+                              <View
+                                key={category.categoryId}
+                                style={[
+                                  styles.categoryRow,
+                                  { backgroundColor: theme.card, borderColor: theme.border },
+                                ]}
+                              >
                                 <TextInput
                                   style={[
                                     styles.editInput,
@@ -465,9 +517,35 @@ export function ManageCategoriesModal({
                                     />
                                   </TouchableOpacity>
                                 </View>
-                              </>
-                            ) : (
-                              <>
+                              </View>
+                            );
+                          }
+                          
+                          // Normal view with swipe-to-archive
+                          return (
+                            <Swipeable
+                              key={category.categoryId}
+                              ref={(ref) => {
+                                if (ref) {
+                                  swipeableRefs.current.set(category.categoryId, ref);
+                                } else {
+                                  swipeableRefs.current.delete(category.categoryId);
+                                }
+                              }}
+                              renderRightActions={(progress, dragX) =>
+                                renderArchiveAction(progress, dragX, category)
+                              }
+                              onSwipeableOpen={() =>
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                              }
+                              enabled={!isArchiving}
+                            >
+                              <View
+                                style={[
+                                  styles.categoryRow,
+                                  { backgroundColor: theme.card, borderColor: theme.border },
+                                ]}
+                              >
                                 <Text style={[styles.categoryName, { color: theme.text }]}>
                                   {category.name}
                                 </Text>
@@ -483,24 +561,11 @@ export function ManageCategoriesModal({
                                       color={isArchiving ? theme.textSecondary : theme.primary}
                                     />
                                   </TouchableOpacity>
-                                  {!category.isDefault && (
-                                    <TouchableOpacity 
-                                      onPress={() => handleArchiveRequest(category)}
-                                      disabled={isArchiving}
-                                    >
-                                      <IconSymbol
-                                        ios_icon_name="archivebox"
-                                        android_material_icon_name="archive"
-                                        size={20}
-                                        color={isArchiving ? theme.textSecondary : theme.warning}
-                                      />
-                                    </TouchableOpacity>
-                                  )}
                                 </View>
-                              </>
-                            )}
-                          </View>
-                        ))}
+                              </View>
+                            </Swipeable>
+                          );
+                        })}
                       </>
                     )}
                   </View>
@@ -512,33 +577,35 @@ export function ManageCategoriesModal({
                         Archived
                       </Text>
                       {archivedCategories.map((category) => (
-                        <View
+                        <Swipeable
                           key={category.categoryId}
-                          style={[
-                            styles.categoryRow,
-                            styles.archivedRow,
-                            { backgroundColor: theme.card, borderColor: theme.border, opacity: 0.6 },
-                          ]}
+                          ref={(ref) => {
+                            if (ref) {
+                              swipeableRefs.current.set(category.categoryId, ref);
+                            } else {
+                              swipeableRefs.current.delete(category.categoryId);
+                            }
+                          }}
+                          renderRightActions={(progress, dragX) =>
+                            renderRestoreAction(progress, dragX, category)
+                          }
+                          onSwipeableOpen={() =>
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                          }
+                          enabled={!isArchiving}
                         >
-                          <Text style={[styles.categoryName, { color: theme.textSecondary }]}>
-                            {category.name}
-                          </Text>
-                          <TouchableOpacity 
-                            onPress={() => handleRestore(category)}
-                            disabled={isArchiving}
-                            style={styles.restoreButton}
+                          <View
+                            style={[
+                              styles.categoryRow,
+                              styles.archivedRow,
+                              { backgroundColor: theme.card, borderColor: theme.border, opacity: 0.6 },
+                            ]}
                           >
-                            <IconSymbol
-                              ios_icon_name="arrow.uturn.backward"
-                              android_material_icon_name="restore"
-                              size={18}
-                              color={isArchiving ? theme.textSecondary : theme.success}
-                            />
-                            <Text style={[styles.restoreText, { color: isArchiving ? theme.textSecondary : theme.success }]}>
-                              Restore
+                            <Text style={[styles.categoryName, { color: theme.textSecondary }]}>
+                              {category.name}
                             </Text>
-                          </TouchableOpacity>
-                        </View>
+                          </View>
+                        </Swipeable>
                       ))}
                     </View>
                   )}
@@ -551,18 +618,6 @@ export function ManageCategoriesModal({
           </Animated.View>
         </View>
       </Modal>
-
-      {/* Archive Confirmation Modal */}
-      <ConfirmModal
-        visible={archiveConfirmVisible}
-        title={archiveConfirmTitle}
-        message={archiveConfirmMessage}
-        confirmText="Archive"
-        cancelText="Cancel"
-        onConfirm={handleConfirmArchive}
-        onCancel={handleCancelArchive}
-        destructive={false}
-      />
     </>
   );
 }
@@ -694,5 +749,24 @@ const styles = StyleSheet.create({
   restoreText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  swipeButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 90,
+    height: '100%',
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  swipeText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });
