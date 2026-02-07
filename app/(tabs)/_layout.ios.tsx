@@ -1,14 +1,15 @@
 
 import React from 'react';
-import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
+import { Stack } from 'expo-router';
 
 export default function TabLayout() {
   return (
-    <NativeTabs>
-      <NativeTabs.Trigger key="home" name="(home)">
-        <Icon sf="list.bullet" />
-        <Label>Items</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="(home)" />
+    </Stack>
   );
 }

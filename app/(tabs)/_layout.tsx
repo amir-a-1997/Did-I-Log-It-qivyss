@@ -16,8 +16,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: theme.textSecondary,
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.card,
-          borderTopColor: theme.border,
+          display: 'none',
         },
       }}
     >

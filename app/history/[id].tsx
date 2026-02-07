@@ -23,6 +23,7 @@ export default function HistoryScreen() {
   const { items, deleteItem, deleteLog } = useLogItems();
 
   const [deleteItemModalVisible, setDeleteItemModalVisible] = useState(false);
+  const [clearHistoryModalVisible, setClearHistoryModalVisible] = useState(false);
   const [deleteLogModalVisible, setDeleteLogModalVisible] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
@@ -44,6 +45,15 @@ export default function HistoryScreen() {
     router.back();
   };
 
+  const handleClearHistory = () => {
+    console.log('User confirmed clear history for:', item.title);
+    // Delete all logs but keep the item
+    item.logs.forEach((log) => {
+      deleteLog(item.id, log.id);
+    });
+    setClearHistoryModalVisible(false);
+  };
+
   const handleDeleteLog = () => {
     if (selectedLogId) {
       console.log('User confirmed delete log:', selectedLogId);
@@ -59,19 +69,22 @@ export default function HistoryScreen() {
         options={{
           title: item.title,
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() => {
-                console.log('User tapped delete item button');
-                setDeleteItemModalVisible(true);
-              }}
-            >
-              <IconSymbol
-                ios_icon_name="trash"
-                android_material_icon_name="delete"
-                size={22}
-                color={theme.danger}
-              />
-            </TouchableOpacity>
+            <View style={styles.headerRightContainer}>
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('User tapped delete item button');
+                  setDeleteItemModalVisible(true);
+                }}
+                style={styles.headerButton}
+              >
+                <IconSymbol
+                  ios_icon_name="trash"
+                  android_material_icon_name="delete"
+                  size={22}
+                  color={theme.danger}
+                />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
@@ -90,10 +103,27 @@ export default function HistoryScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
-          <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-            {item.logs.length === 0 ? 'No logs yet' : `${item.logs.length} log entries`}
-          </Text>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
+              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                {item.logs.length === 0 ? 'No logs yet' : `${item.logs.length} log entries`}
+              </Text>
+            </View>
+            {item.logs.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('User tapped clear history button');
+                  setClearHistoryModalVisible(true);
+                }}
+                style={[styles.clearButton, { backgroundColor: theme.card, borderColor: theme.border }]}
+              >
+                <Text style={[styles.clearButtonText, { color: theme.textSecondary }]}>
+                  Clear History
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {item.logs.length === 0 ? (
@@ -137,6 +167,7 @@ export default function HistoryScreen() {
                       setSelectedLogId(log.id);
                       setDeleteLogModalVisible(true);
                     }}
+                    style={styles.deleteLogButton}
                   >
                     <IconSymbol
                       ios_icon_name="trash"
@@ -155,12 +186,23 @@ export default function HistoryScreen() {
       <ConfirmModal
         visible={deleteItemModalVisible}
         title="Delete Item?"
-        message={`Are you sure you want to delete "${item.title}"? This will remove all log history.`}
-        confirmText="Delete"
+        message={`Are you sure you want to delete "${item.title}"? This will permanently remove the item and all its log history.`}
+        confirmText="Delete Item"
         cancelText="Cancel"
         destructive={true}
         onConfirm={handleDeleteItem}
         onCancel={() => setDeleteItemModalVisible(false)}
+      />
+
+      <ConfirmModal
+        visible={clearHistoryModalVisible}
+        title="Clear History?"
+        message={`Are you sure you want to clear all log history for "${item.title}"? The item will be kept, but all log entries will be deleted.`}
+        confirmText="Clear History"
+        cancelText="Cancel"
+        destructive={true}
+        onConfirm={handleClearHistory}
+        onCancel={() => setClearHistoryModalVisible(false)}
       />
 
       <ConfirmModal
@@ -190,6 +232,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  headerButton: {
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     padding: 20,
     borderRadius: 12,
@@ -214,6 +267,11 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -221,6 +279,16 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     fontSize: 14,
+  },
+  clearButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  clearButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   emptyCard: {
     padding: 40,
@@ -267,5 +335,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     flex: 1,
+  },
+  deleteLogButton: {
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

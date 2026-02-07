@@ -15,11 +15,11 @@ export function formatLastLogged(timestamp: string | undefined): string {
   const daysAgo = getDaysAgo(timestamp);
 
   if (daysAgo === 0) {
-    return 'Today';
+    return 'Last logged: today';
   } else if (daysAgo === 1) {
-    return '1 day ago';
+    return 'Last logged: 1 day ago';
   } else {
-    return `${daysAgo} days ago`;
+    return `Last logged: ${daysAgo} days ago`;
   }
 }
 

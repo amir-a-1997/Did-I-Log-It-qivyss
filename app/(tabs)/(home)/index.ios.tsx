@@ -46,19 +46,22 @@ export default function HomeScreen() {
         options={{
           title: 'Did I Log It?',
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() => {
-                console.log('User tapped add button');
-                setAddModalVisible(true);
-              }}
-            >
-              <IconSymbol
-                ios_icon_name="plus"
-                android_material_icon_name="add"
-                size={24}
-                color={theme.primary}
-              />
-            </TouchableOpacity>
+            <View style={styles.headerRightContainer}>
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('User tapped add button');
+                  setAddModalVisible(true);
+                }}
+                style={styles.addButton}
+              >
+                <IconSymbol
+                  ios_icon_name="plus"
+                  android_material_icon_name="add"
+                  size={24}
+                  color={theme.primary}
+                />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
@@ -180,6 +183,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  addButton: {
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterScroll: {
     maxHeight: 60,

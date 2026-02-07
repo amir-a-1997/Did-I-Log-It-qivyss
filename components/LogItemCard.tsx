@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { colors } from '@/styles/commonStyles';
 import { LogItem } from '@/types/LogItem';
 import { formatLastLogged, getDaysAgo } from '@/utils/dateUtils';
@@ -15,6 +16,7 @@ interface LogItemCardProps {
 export function LogItemCard({ item, onLog, onPress }: LogItemCardProps) {
   const colorScheme = useColorScheme();
   const theme = colors[colorScheme ?? 'light'];
+  const [justLogged, setJustLogged] = useState(false);
 
   const lastLog = item.logs[0];
   const lastLoggedText = formatLastLogged(lastLog?.timestamp);
@@ -27,6 +29,28 @@ export function LogItemCard({ item, onLog, onPress }: LogItemCardProps) {
     if (daysAgo <= 30) return theme.warning;
     return theme.danger;
   };
+
+  const handleLogPress = async (e: any) => {
+    e.stopPropagation();
+    console.log('User tapped Log It button for:', item.title);
+    
+    // Trigger haptic feedback
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Show instant confirmation
+    setJustLogged(true);
+    
+    // Call the log function
+    onLog();
+    
+    // Reset the confirmation after 2 seconds
+    setTimeout(() => {
+      setJustLogged(false);
+    }, 2000);
+  };
+
+  const displayText = justLogged ? 'Logged just now' : lastLoggedText;
+  const displayColor = justLogged ? theme.success : getDaysColor();
 
   return (
     <TouchableOpacity
@@ -46,17 +70,13 @@ export function LogItemCard({ item, onLog, onPress }: LogItemCardProps) {
             >
               <Text style={[styles.categoryText, { color: theme.primary }]}>{item.category}</Text>
             </View>
-            <Text style={[styles.lastLogged, { color: getDaysColor() }]}>{lastLoggedText}</Text>
+            <Text style={[styles.lastLogged, { color: displayColor }]}>{displayText}</Text>
           </View>
         </View>
 
         <TouchableOpacity
           style={[styles.logButton, { backgroundColor: theme.primary }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            console.log('User tapped Log It button for:', item.title);
-            onLog();
-          }}
+          onPress={handleLogPress}
         >
           <IconSymbol
             ios_icon_name="checkmark"
