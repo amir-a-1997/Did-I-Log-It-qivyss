@@ -1,4 +1,3 @@
-
 {
   "expo": {
     "name": "Did I Log It?",
@@ -42,7 +41,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "backendUrl": "https://f9adjsayev8rzh8qshfj2y8r3ypdc58j.app.specular.dev"
     }
   }
 }
