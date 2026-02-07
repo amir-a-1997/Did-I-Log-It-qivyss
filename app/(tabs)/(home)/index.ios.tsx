@@ -17,7 +17,6 @@ import { AddItemModal } from '@/components/AddItemModal';
 import { ManageCategoriesModal } from '@/components/ManageCategoriesModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { IconSymbol } from '@/components/IconSymbol';
-import { IconButton } from '@/components/IconButton';
 import { DEFAULT_CATEGORIES } from '@/types/LogItem';
 
 export default function HomeScreen() {
@@ -40,6 +39,7 @@ export default function HomeScreen() {
       : items.filter((item) => item.category === selectedCategory);
 
   const handleLogItem = (itemId: string) => {
+    console.log('User tapped Log It button for item:', itemId);
     logItem(itemId);
   };
 
@@ -69,27 +69,16 @@ export default function HomeScreen() {
     setItemToDelete(null);
   };
 
+  const handleAddNewItemPress = () => {
+    console.log('User tapped Add New Item row at bottom');
+    setAddModalVisible(true);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Stack.Screen
         options={{
           title: 'Did I Log It?',
-          headerRight: () => (
-            <IconButton
-              onPress={() => {
-                console.log('User tapped add button');
-                setAddModalVisible(true);
-              }}
-              accessibilityLabel="Add new item"
-            >
-              <IconSymbol
-                ios_icon_name="plus"
-                android_material_icon_name="add"
-                size={24}
-                color={theme.primary}
-              />
-            </IconButton>
-          ),
         }}
       />
 
@@ -197,7 +186,7 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                   {selectedCategory === 'All'
-                    ? 'Tap the + button to add your first item'
+                    ? 'Tap "Add new item" below to get started'
                     : 'Try a different category or add a new item'}
                 </Text>
               </View>
@@ -212,6 +201,25 @@ export default function HomeScreen() {
                 />
               ))
             )}
+
+            <TouchableOpacity
+              style={[styles.addNewItemRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={handleAddNewItemPress}
+            >
+              <View style={styles.addNewItemContent}>
+                <View style={[styles.addIconContainer, { backgroundColor: theme.primaryLight }]}>
+                  <IconSymbol
+                    ios_icon_name="plus"
+                    android_material_icon_name="add"
+                    size={20}
+                    color={theme.primary}
+                  />
+                </View>
+                <Text style={[styles.addNewItemText, { color: theme.text }]}>
+                  Add new item
+                </Text>
+              </View>
+            </TouchableOpacity>
           </ScrollView>
         </>
       )}
@@ -293,6 +301,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 32,
   },
   emptyCard: {
     padding: 40,
@@ -300,6 +309,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     marginTop: 40,
+    marginBottom: 16,
   },
   emptyTitle: {
     fontSize: 18,
@@ -311,5 +321,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  addNewItemRow: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  addNewItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  addNewItemText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

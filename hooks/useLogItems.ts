@@ -74,17 +74,39 @@ export function useLogItems() {
     await saveItems([...items, newItem]);
   };
 
-  const logItem = async (itemId: string) => {
+  const logItem = useCallback(async (itemId: string) => {
     console.log('Logging item:', itemId);
+    
+    // CRITICAL FIX: Read from storage first to get the latest data (single source of truth)
+    const storedItems = await storage.getItem(STORAGE_KEY);
+    const currentItems = storedItems ? JSON.parse(storedItems) : [];
+    
+    console.log('Current items from storage before logging:', currentItems.length);
+    
+    // Create new log entry
     const newLog: LogEntry = {
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
     };
-    const updatedItems = items.map((item) =>
+    
+    // Update the item by reading from storage, not from in-memory state
+    const updatedItems = currentItems.map((item: LogItem) =>
       item.id === itemId ? { ...item, logs: [newLog, ...item.logs] } : item
     );
-    await saveItems(updatedItems);
-  };
+    
+    // Save to persistent storage
+    await storage.setItem(STORAGE_KEY, JSON.stringify(updatedItems));
+    console.log('Log entry added and saved to storage for item:', itemId);
+    
+    // Update in-memory state
+    setItems(updatedItems);
+    
+    // Verify the log was added by reading back from storage
+    const verifyItems = await storage.getItem(STORAGE_KEY);
+    const verifiedItems = verifyItems ? JSON.parse(verifyItems) : [];
+    const verifiedItem = verifiedItems.find((item: LogItem) => item.id === itemId);
+    console.log('Verified item after logging - logs count:', verifiedItem?.logs.length || 0);
+  }, []);
 
   const deleteItem = useCallback(async (itemId: string) => {
     console.log('Deleting item and all history:', itemId);
@@ -97,7 +119,12 @@ export function useLogItems() {
 
   const deleteLog = async (itemId: string, logId: string) => {
     console.log('Deleting log:', logId, 'from item:', itemId);
-    const updatedItems = items.map((item) =>
+    
+    // Read from storage first to ensure we have the latest data
+    const storedItems = await storage.getItem(STORAGE_KEY);
+    const currentItems = storedItems ? JSON.parse(storedItems) : [];
+    
+    const updatedItems = currentItems.map((item: LogItem) =>
       item.id === itemId
         ? { ...item, logs: item.logs.filter((log) => log.id !== logId) }
         : item
@@ -108,7 +135,7 @@ export function useLogItems() {
   const clearItemHistory = useCallback(async (itemId: string) => {
     console.log('Clearing ALL history for item:', itemId);
     
-    // CRITICAL: Read from storage first to ensure we have the latest data
+    // CRITICAL: Read from storage first to ensure we have the latest data (single source of truth)
     const storedItems = await storage.getItem(STORAGE_KEY);
     const currentItems = storedItems ? JSON.parse(storedItems) : [];
     
